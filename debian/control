@@ -1,0 +1,19 @@
+Source: nettica-client
+Section: net
+Priority: optional
+Maintainer: Alan Graham <alan@nettica.app>
+Build-Depends: debhelper (>= 9),
+               dh-autoreconf,
+               dh-systemd (>= 1.5),
+               golang,
+               pkg-config
+Standards-Version: 3.9.8
+Vcs-Git: git@github.com:nettica-com/nettica-admin-client.git
+Vcs-Browser: https://github.com/nettica-com/nettica-admin-client
+
+Package: nettica-client
+Architecture: amd64
+Depends: lsb-base (>= 4.1),
+         ${shlibs:Depends}
+Description: nettica-client manages wireguard connections for the nettica control plane
+

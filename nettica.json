@@ -1,0 +1,9 @@
+{
+    "Host": "https://my.nettica.app",
+    "HostID": "",
+    "ApiKey": "",
+    "CheckInterval" : 10,
+    "SourceAddress" : "0.0.0.0",
+    "quiet" : true,
+    "debug" : false
+}

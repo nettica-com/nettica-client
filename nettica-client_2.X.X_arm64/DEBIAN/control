@@ -1,0 +1,5 @@
+Package: nettica-client
+Version: 2.X.0
+Architecture: arm64
+Maintainer: Nettica.com <info@nettica.app>
+Description: Nettica-Client of debian distributions

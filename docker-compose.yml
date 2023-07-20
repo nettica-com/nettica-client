@@ -1,0 +1,24 @@
+version: '3.3'
+services:
+  nettica-client:
+    container_name: nettica-client
+    image: nettica-client
+    build:
+      context: .
+      dockerfile: Dockerfile
+    network_mode: bridge
+    environment:
+      - USERID
+      - GROUPID
+      - NETTICA_HOST
+      - NETTICA_HOST_ID
+      - NETTICA_API_KEY
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    dns:
+      - 8.8.8.8
+      - 9.9.9.9
+    ports:
+      - "30000:30000/udp"
+
