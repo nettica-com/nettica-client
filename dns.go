@@ -63,7 +63,7 @@ func StartDNS() error {
 	for i := 0; i < len(msg.Config); i++ {
 		index := -1
 		for j := 0; j < len(msg.Config[i].Hosts); j++ {
-			if msg.Config[i].Hosts[j].HostGroup == config.HostID {
+			if msg.Config[i].Hosts[j].HostGroup == config.DeviceID {
 				index = j
 				break
 			}
@@ -135,7 +135,7 @@ func UpdateDNS(msg model.Message) error {
 	for i := 0; i < len(msg.Config); i++ {
 		index := -1
 		for j := 0; j < len(msg.Config[i].Hosts); j++ {
-			if msg.Config[i].Hosts[j].HostGroup == config.HostID {
+			if msg.Config[i].Hosts[j].HostGroup == config.DeviceID {
 				index = j
 				break
 			}

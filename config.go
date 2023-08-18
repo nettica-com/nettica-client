@@ -14,7 +14,7 @@ import (
 var config struct {
 	Quiet         bool
 	Host          string
-	HostID        string
+	DeviceID      string
 	ApiKey        string
 	ServiceGroup  string
 	ServiceApiKey string
@@ -60,7 +60,7 @@ func reloadConfig() error {
 	json.Unmarshal(data, &config)
 
 	log.Infof("Host: %s", config.Host)
-	log.Infof("HostID: %s", config.HostID)
+	log.Infof("DeviceID: %s", config.DeviceID)
 	log.Infof("ApiKey: %s", config.ApiKey)
 	log.Infof("Quiet: %t", config.Quiet)
 
@@ -85,7 +85,7 @@ func loadConfig() error {
 
 		// load defaults from environment
 		config.Host = os.Getenv("NETTICA_HOST")
-		config.HostID = os.Getenv("NETTICA_HOST_ID")
+		config.DeviceID = os.Getenv("NETTICA_HOST_ID")
 		config.ApiKey = os.Getenv("NETTICA_API_KEY")
 		config.ServiceGroup = os.Getenv("NETTICA_SERVICE_GROUP")
 		config.ServiceApiKey = os.Getenv("NETTICA_SERVICE_API_KEY")
@@ -97,7 +97,7 @@ func loadConfig() error {
 		// pick up command line arguments
 		config.path = flag.String("C", "nettica.conf", "Path to configuration file")
 		Host := flag.String("server", "", "Nettica server to connect to")
-		HostID := flag.String("hostid", "", "Host ID to use")
+		DeviceID := flag.String("DeviceID", "", "Host ID to use")
 		ServiceGroup := flag.String("servicegroup", "", "Service group to use")
 		ServiceApiKey := flag.String("serviceapikey", "", "Service API key to use")
 
@@ -110,7 +110,7 @@ func loadConfig() error {
 		// Open the config file specified
 
 		file, err := os.Open(GetDataPath() + *config.path)
-		if err != nil && *Host == "" && *HostID == "" && *ApiKey == "" && config.HostID == "" && config.ApiKey == "" {
+		if err != nil && *Host == "" && *DeviceID == "" && *ApiKey == "" && config.DeviceID == "" && config.ApiKey == "" {
 			return err
 		}
 
@@ -130,8 +130,8 @@ func loadConfig() error {
 		if *Host != "" {
 			config.Host = *Host
 		}
-		if *HostID != "" {
-			config.HostID = *HostID
+		if *DeviceID != "" {
+			config.DeviceID = *DeviceID
 		}
 		if *ApiKey != "" {
 			config.ApiKey = *ApiKey
@@ -162,7 +162,7 @@ func loadConfig() error {
 		}
 		config.loaded = true
 		log.Infof("Host:   %s", config.Host)
-		log.Infof("HostID: %s", config.HostID)
+		log.Infof("DeviceID: %s", config.DeviceID)
 		log.Infof("ApiKey: %s", config.ApiKey)
 		log.Infof("Quiet:  %t", config.Quiet)
 
@@ -178,7 +178,7 @@ func loadConfig() error {
 		}
 
 		log.Infof("Host:   %s", config.Host)
-		log.Infof("HostID: %s", config.HostID)
+		log.Infof("DeviceID: %s", config.DeviceID)
 		log.Infof("ApiKey: %s", config.ApiKey)
 		log.Infof("Quiet:  %t", config.Quiet)
 

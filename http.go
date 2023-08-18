@@ -161,12 +161,12 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	case "GET":
 		log.Infof("Method: %s", req.Method)
 		Host := req.URL.Query().Get("Host")
-		HostID := req.URL.Query().Get("HostID")
+		DeviceID := req.URL.Query().Get("DeviceID")
 		ApiKey := req.URL.Query().Get("ApiKey")
 		CheckInterval, _ := strconv.ParseInt(req.URL.Query().Get("CheckInterval"), 10, 0)
-		if Host != "" && HostID != "" && ApiKey != "" && CheckInterval != 0 {
+		if Host != "" && DeviceID != "" && ApiKey != "" && CheckInterval != 0 {
 			config.Host = Host
-			config.HostID = HostID
+			config.DeviceID = DeviceID
 			config.ApiKey = ApiKey
 			config.CheckInterval = CheckInterval
 			saveConfig()

@@ -17,8 +17,8 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-var netticaHostAPIFmt = "%s/api/v1.0/host/%s/status"
-var netticaHostUpdateAPIFmt = "%s/api/v1.0/host/%s"
+var netticaHostAPIFmt = "%s/api/v1.0/device/%s/status"
+var netticaHostUpdateAPIFmt = "%s/api/v1.0/device/%s"
 
 // Start the channel that iterates the nettica update function
 func StartChannel(c chan []byte) {
@@ -33,14 +33,14 @@ func StartChannel(c chan []byte) {
 			break
 		}
 
-		etag, err = GetMeshifyConfig(etag)
+		etag, err = GetNetticaConfig(etag)
 		if err != nil {
 			log.Errorf("Error getting nettica config: %v", err)
 		}
 	}
 }
 
-func CallMeshify(etag *string) ([]byte, error) {
+func CallNettica(etag *string) ([]byte, error) {
 
 	host := config.Host
 	var client *http.Client
@@ -66,7 +66,7 @@ func CallMeshify(etag *string) ([]byte, error) {
 
 	}
 
-	var reqURL string = fmt.Sprintf(netticaHostAPIFmt, host, config.HostID)
+	var reqURL string = fmt.Sprintf(netticaHostAPIFmt, host, config.DeviceID)
 	if !config.Quiet {
 		log.Infof("  GET %s", reqURL)
 	}
@@ -123,7 +123,7 @@ func CallMeshify(etag *string) ([]byte, error) {
 
 }
 
-func GetMeshifyConfig(etag string) (string, error) {
+func GetNetticaConfig(etag string) (string, error) {
 
 	if !config.loaded {
 		err := loadConfig()
@@ -132,7 +132,7 @@ func GetMeshifyConfig(etag string) (string, error) {
 		}
 	}
 
-	body, err := CallMeshify(&etag)
+	body, err := CallNettica(&etag)
 	if err != nil {
 		if err.Error() == "Unauthorized" {
 			log.Errorf("Unauthorized - looking for another API key")
@@ -146,15 +146,15 @@ func GetMeshifyConfig(etag string) (string, error) {
 					for _, net := range conf.Config {
 						for _, host := range net.Hosts {
 
-							if host.HostGroup == config.HostID && host.APIKey != config.ApiKey {
+							if host.HostGroup == config.DeviceID && host.APIKey != config.ApiKey {
 								config.ApiKey = host.APIKey
 								saveConfig()
 								log.Infof("Trying %s %s", host.HostGroup, host.APIKey)
-								body, err = CallMeshify(&etag)
+								body, err = CallNettica(&etag)
 								if err == nil {
 									log.Infof("Found working API key - etag %s", etag)
 									found = true
-									UpdateMeshifyConfig(body)
+									UpdateNetticaConfig(body)
 									return etag, nil
 									break
 								}
@@ -179,7 +179,7 @@ func GetMeshifyConfig(etag string) (string, error) {
 			log.Error(err)
 		}
 	} else {
-		UpdateMeshifyConfig(body)
+		UpdateNetticaConfig(body)
 		return etag, nil
 	}
 
@@ -253,8 +253,8 @@ func UpdateHost(host model.Host) error {
 	return nil
 }
 
-// UpdateMeshifyConfig updates the config from the server
-func UpdateMeshifyConfig(body []byte) {
+// UpdateNetticaConfig updates the config from the server
+func UpdateNetticaConfig(body []byte) {
 
 	// If the file doesn't exist create it for the first time
 	if _, err := os.Stat(GetDataPath() + "nettica.json"); os.IsNotExist(err) {
@@ -340,7 +340,7 @@ func UpdateMeshifyConfig(body []byte) {
 				os.Remove(GetDataPath() + oldconf.Config[i].NetName + ".conf")
 
 				for _, host := range oldconf.Config[i].Hosts {
-					if host.HostGroup == config.HostID {
+					if host.HostGroup == config.DeviceID {
 						KeyDelete(host.Current.PublicKey)
 						KeySave()
 					}
@@ -352,7 +352,7 @@ func UpdateMeshifyConfig(body []byte) {
 		for i := 0; i < len(msg.Config); i++ {
 			index := -1
 			for j := 0; j < len(msg.Config[i].Hosts); j++ {
-				if msg.Config[i].Hosts[j].HostGroup == config.HostID {
+				if msg.Config[i].Hosts[j].HostGroup == config.DeviceID {
 					index = j
 					break
 				}
@@ -532,7 +532,7 @@ func StartBackgroundRefreshService() {
 		for i := 0; i < len(msg.Config); i++ {
 			index := -1
 			for j := 0; j < len(msg.Config[i].Hosts); j++ {
-				if msg.Config[i].Hosts[j].HostGroup == config.HostID {
+				if msg.Config[i].Hosts[j].HostGroup == config.DeviceID {
 					index = j
 					break
 				}

@@ -136,7 +136,7 @@ func StartContainers() error {
 			} else {
 				service.ContainerId = id
 				service.Status = "Running"
-				UpdateMeshifyServiceHost(service)
+				UpdateNetticaServiceHost(service)
 				log.Infof("Started service %s", service.ContainerId)
 			}
 		} else {
@@ -147,7 +147,7 @@ func StartContainers() error {
 				if err == nil {
 					service.ContainerId = id
 					service.Status = "Running"
-					UpdateMeshifyServiceHost(service)
+					UpdateNetticaServiceHost(service)
 					log.Infof("Restarted service %s", service.ContainerId)
 				}
 			}
@@ -156,7 +156,7 @@ func StartContainers() error {
 	return nil
 }
 
-func UpdateMeshifyServiceHost(service model.Service) error {
+func UpdateNetticaServiceHost(service model.Service) error {
 
 	log.Infof("UPDATING SERVICE: %v", service)
 	server := config.Host
@@ -287,11 +287,11 @@ func UpdateServiceHostConfig(body []byte) {
 				if err != nil {
 					log.Errorf("Error starting service %v", err)
 					service.Status = "Error"
-					UpdateMeshifyServiceHost(service)
+					UpdateNetticaServiceHost(service)
 				} else {
 					service.ContainerId = id
 					service.Status = "Running"
-					UpdateMeshifyServiceHost(service)
+					UpdateNetticaServiceHost(service)
 				}
 			} else {
 				// If the container isn't running (eg, reboot), restart it
@@ -301,11 +301,11 @@ func UpdateServiceHostConfig(body []byte) {
 					if err == nil {
 						service.ContainerId = id
 						service.Status = "Running"
-						UpdateMeshifyServiceHost(service)
+						UpdateNetticaServiceHost(service)
 					} else {
 						log.Errorf("Error restarting service %v", err)
 						service.Status = "Error"
-						UpdateMeshifyServiceHost(service)
+						UpdateNetticaServiceHost(service)
 					}
 				}
 			}

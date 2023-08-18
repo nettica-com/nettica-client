@@ -1,6 +1,6 @@
 {
     "Host": "https://my.nettica.com",
-    "HostID": "",
+    "DeviceID": "",
     "ApiKey": "",
     "CheckInterval" : 10,
     "SourceAddress" : "0.0.0.0",
