@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"io/ioutil"
@@ -19,7 +18,6 @@ var config struct {
 	ServiceGroup  string
 	ServiceApiKey string
 	CheckInterval int64
-	tls           tls.Config
 	SourceAddress string
 	sourceAddr    *net.TCPAddr
 	Debug         bool
@@ -81,7 +79,6 @@ func loadConfig() error {
 		config.Quiet = false
 		config.CheckInterval = 10
 		config.SourceAddress = "0.0.0.0"
-		config.tls.MinVersion = tls.VersionTLS10
 
 		// load defaults from environment
 		config.Host = os.Getenv("NETTICA_HOST")

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -84,7 +85,7 @@ func StartServiceHost(c chan []byte) {
 					log.Errorf("Response Error Code: %v, sleeping 10 seconds", resp.StatusCode)
 					time.Sleep(10 * time.Second)
 				} else {
-					body, err := ioutil.ReadAll(resp.Body)
+					body, err := io.ReadAll(resp.Body)
 					if err != nil {
 						log.Errorf("error reading body %v", err)
 					}
@@ -108,13 +109,13 @@ func StartServiceHost(c chan []byte) {
 }
 
 func StartContainers() error {
-	file, err := os.Open(GetDataPath() + "nettica-service-host.conf")
+	file, err := os.Open(GetDataPath() + "nettica-service-host.json")
 
 	if err != nil {
 		log.Errorf("Error opening config file %v", err)
 		return err
 	}
-	body, err := ioutil.ReadAll(file)
+	body, err := io.ReadAll(file)
 	file.Close()
 	if err != nil {
 		log.Errorf("Error reading nettica config file: %v", err)
@@ -227,14 +228,14 @@ func UpdateNetticaServiceHost(service model.Service) error {
 func UpdateServiceHostConfig(body []byte) {
 
 	// If the file doesn't exist create it for the first time
-	if _, err := os.Stat(GetDataPath() + "nettica-service-host.conf"); os.IsNotExist(err) {
-		file, err := os.OpenFile(GetDataPath()+"nettica-service-host.conf", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+	if _, err := os.Stat(GetDataPath() + "nettica-service-host.json"); os.IsNotExist(err) {
+		file, err := os.OpenFile(GetDataPath()+"nettica-service-host.json", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 		if err == nil {
 			file.Close()
 		}
 	}
 
-	file, err := os.Open(GetDataPath() + "nettica-service-host.conf")
+	file, err := os.Open(GetDataPath() + "nettica-service-host.json")
 
 	if err != nil {
 		log.Errorf("Error opening config file %v", err)
@@ -251,15 +252,15 @@ func UpdateServiceHostConfig(body []byte) {
 	if bytes.Equal(conf, body) {
 		return
 	} else {
-		file, err := os.OpenFile(GetDataPath()+"nettica-service-host.conf", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+		file, err := os.OpenFile(GetDataPath()+"nettica-service-host.json", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 		if err != nil {
-			log.Errorf("Error opening nettica-service-host.conf for write: %v", err)
+			log.Errorf("Error opening nettica-service-host.json for write: %v", err)
 			return
 		}
 		_, err = file.Write(body)
 		file.Close()
 		if err != nil {
-			log.Infof("Error writing nettica-service-host.conf file: %v", err)
+			log.Infof("Error writing nettica-service-host.json file: %v", err)
 			return
 		}
 		var msg model.ServiceMessage
