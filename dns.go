@@ -32,7 +32,7 @@ func StartDNS() error {
 
 	var conf []byte
 	for exists := false; !exists; {
-		file, err := os.Open(GetDataPath() + "nettica.conf")
+		file, err := os.Open(GetDataPath() + "nettica.json")
 		if err != nil {
 			time.Sleep(time.Second)
 		} else {

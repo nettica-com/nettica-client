@@ -95,7 +95,7 @@ func loadConfig() error {
 		}
 
 		// pick up command line arguments
-		config.path = flag.String("C", "nettica.json", "Path to configuration file")
+		config.path = flag.String("C", "nettica.conf", "Path to configuration file")
 		Host := flag.String("server", "", "Nettica server to connect to")
 		HostID := flag.String("hostid", "", "Host ID to use")
 		ServiceGroup := flag.String("servicegroup", "", "Service group to use")
@@ -145,7 +145,7 @@ func loadConfig() error {
 		}
 
 		if config.Host == "" {
-			return &configError{"A nettica.json file with a Host parameter is required"}
+			return &configError{"A nettica.conf file with a Host parameter is required"}
 		}
 
 		if *CheckInterval != 0 {
@@ -161,10 +161,10 @@ func loadConfig() error {
 			return err
 		}
 		config.loaded = true
-		log.Infof("Host: %s", config.Host)
+		log.Infof("Host:   %s", config.Host)
 		log.Infof("HostID: %s", config.HostID)
 		log.Infof("ApiKey: %s", config.ApiKey)
-		log.Infof("Quiet: %t", config.Quiet)
+		log.Infof("Quiet:  %t", config.Quiet)
 
 	} else {
 		file, err := os.Open(GetDataPath() + *config.path)
@@ -177,10 +177,10 @@ func loadConfig() error {
 			return err
 		}
 
-		log.Infof("Host: %s", config.Host)
+		log.Infof("Host:   %s", config.Host)
 		log.Infof("HostID: %s", config.HostID)
 		log.Infof("ApiKey: %s", config.ApiKey)
-		log.Infof("Quiet: %t", config.Quiet)
+		log.Infof("Quiet:  %t", config.Quiet)
 
 		config.loaded = true
 	}

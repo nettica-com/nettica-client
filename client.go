@@ -84,7 +84,7 @@ func CallMeshify(etag *string) ([]byte, error) {
 	resp, err := client.Do(req)
 	if err == nil {
 		if resp.StatusCode == 304 {
-			buffer, err := ioutil.ReadFile(GetDataPath() + "nettica.conf")
+			buffer, err := ioutil.ReadFile(GetDataPath() + "nettica.json")
 			if err == nil {
 				return buffer, nil
 			}
@@ -137,7 +137,7 @@ func GetMeshifyConfig(etag string) (string, error) {
 		if err.Error() == "Unauthorized" {
 			log.Errorf("Unauthorized - looking for another API key")
 			// Read the config and find another API key
-			buffer, err := ioutil.ReadFile(GetDataPath() + "nettica.conf")
+			buffer, err := ioutil.ReadFile(GetDataPath() + "nettica.json")
 			if err == nil {
 				var conf model.Message
 				err = json.Unmarshal(buffer, &conf)
@@ -164,9 +164,9 @@ func GetMeshifyConfig(etag string) (string, error) {
 					if !found {
 						if len(conf.Config) == 1 {
 							// Only one net and getting a 401, so lets delete that net too
-							err = os.Remove(GetDataPath() + "nettica.conf")
+							err = os.Remove(GetDataPath() + "nettica.json")
 							if err != nil {
-								log.Errorf("Failed to delete nettica.conf")
+								log.Errorf("Failed to delete nettica.json")
 							}
 						}
 					}
@@ -257,17 +257,17 @@ func UpdateHost(host model.Host) error {
 func UpdateMeshifyConfig(body []byte) {
 
 	// If the file doesn't exist create it for the first time
-	if _, err := os.Stat(GetDataPath() + "nettica.conf"); os.IsNotExist(err) {
-		file, err := os.OpenFile(GetDataPath()+"nettica.conf", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+	if _, err := os.Stat(GetDataPath() + "nettica.json"); os.IsNotExist(err) {
+		file, err := os.OpenFile(GetDataPath()+"nettica.json", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 		if err == nil {
 			file.Close()
 		}
 	}
 
-	file, err := os.Open(GetDataPath() + "nettica.conf")
+	file, err := os.Open(GetDataPath() + "nettica.json")
 
 	if err != nil {
-		log.Errorf("Error opening nettica.conf file %v", err)
+		log.Errorf("Error opening nettica.json file %v", err)
 		return
 	}
 	conf, err := ioutil.ReadAll(file)
@@ -281,7 +281,7 @@ func UpdateMeshifyConfig(body []byte) {
 	if bytes.Equal(conf, body) {
 		return
 	} else {
-		log.Info("Config has changed, updating nettica.conf")
+		log.Info("Config has changed, updating nettica.json")
 
 		// if we can't read the message, immediately return
 		var msg model.Message
@@ -291,15 +291,15 @@ func UpdateMeshifyConfig(body []byte) {
 			return
 		}
 
-		file, err := os.OpenFile(GetDataPath()+"nettica.conf", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+		file, err := os.OpenFile(GetDataPath()+"nettica.json", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 		if err != nil {
-			log.Errorf("Error opening nettica.conf for write: %v", err)
+			log.Errorf("Error opening nettica.json for write: %v", err)
 			return
 		}
 		_, err = file.Write(body)
 		file.Close()
 		if err != nil {
-			log.Infof("Error writing nettica.conf file: %v", err)
+			log.Infof("Error writing nettica.json file: %v", err)
 			return
 		}
 
@@ -504,9 +504,9 @@ func StartBackgroundRefreshService() {
 
 	for {
 
-		file, err := os.Open(GetDataPath() + "nettica.conf")
+		file, err := os.Open(GetDataPath() + "nettica.json")
 		if err != nil {
-			log.Errorf("Error opening nettica.conf for read: %v", err)
+			log.Errorf("Error opening nettica.json for read: %v", err)
 			return
 		}
 		bytes, err := ioutil.ReadAll(file)

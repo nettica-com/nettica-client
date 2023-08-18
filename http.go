@@ -150,10 +150,44 @@ func stopServiceHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func configHandler(w http.ResponseWriter, req *http.Request) {
+	// decode the GET request parameters and save them to the config
+
+	// add the headers here to pass preflight checks
+	w.Header().Add("Access-Control-Allow-Origin", "*")
+	w.Header().Add("Access-Control-Allow-Methods", "*")
+
+	switch req.Method {
+	case "GET":
+		log.Infof("Method: %s", req.Method)
+		Host := req.URL.Query().Get("Host")
+		HostID := req.URL.Query().Get("HostID")
+		ApiKey := req.URL.Query().Get("ApiKey")
+		CheckInterval, _ := strconv.ParseInt(req.URL.Query().Get("CheckInterval"), 10, 0)
+		if Host != "" && HostID != "" && ApiKey != "" && CheckInterval != 0 {
+			config.Host = Host
+			config.HostID = HostID
+			config.ApiKey = ApiKey
+			config.CheckInterval = CheckInterval
+			saveConfig()
+		} else {
+			log.Error("Invalid config parameters")
+		}
+	}
+	data, err := json.Marshal(config)
+	if err != nil {
+		return
+	}
+	// write the config back to the caller
+	io.WriteString(w, string(data))
+
+}
+
 func startHTTPd() {
 	http.HandleFunc("/stats/", statsHandler)
 	http.HandleFunc("/keys/", keyHandler)
 	http.HandleFunc("/service/", stopServiceHandler)
+	http.HandleFunc("/config/", configHandler)
 
 	log.Infof("Starting web server on %s", ":53280")
 
