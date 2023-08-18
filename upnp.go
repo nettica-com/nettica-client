@@ -30,11 +30,11 @@ func isBogon(ip string) bool {
 	return false
 }
 
-func ConfigureUPnP(host model.Host) error {
+func ConfigureUPnP(vpn model.VPN) error {
 
-	if host.Current.UPnP {
+	if vpn.Current.UPnP {
 
-		log.Infof("***UPNP*** Configuring UPnP for %s", host.Name)
+		log.Infof("***UPNP*** Configuring UPnP for %s", vpn.Name)
 		clients, _, err := internetgateway1.NewWANIPConnection1Clients()
 
 		if err != nil {
@@ -45,7 +45,7 @@ func ConfigureUPnP(host model.Host) error {
 		}
 		for _, c := range clients {
 
-			if host.Current.ListenPort != 0 && host.Current.Endpoint != "" {
+			if vpn.Current.ListenPort != 0 && vpn.Current.Endpoint != "" {
 				// get local ip address
 				conn, err := net.Dial("udp", "8.8.8.8:53")
 				if err != nil {
@@ -61,24 +61,24 @@ func ConfigureUPnP(host model.Host) error {
 					} else {
 						log.Infof("***UPNP*** External IP address: %s", externalIP)
 						// compare the externalIP to the endpoint
-						parts := strings.Split(host.Current.Endpoint, ":")
+						parts := strings.Split(vpn.Current.Endpoint, ":")
 						if parts[0] != externalIP && !isBogon(externalIP) {
 							log.Error("External IP address does not match endpoint")
-							// Update the host endpoint at nettica
-							host.Current.Endpoint = externalIP + ":" + parts[1]
-							UpdateHost(host)
+							// Update the vpn endpoint at nettica
+							vpn.Current.Endpoint = externalIP + ":" + parts[1]
+							UpdateVPN(vpn)
 						}
 					}
 
 					// delete any old port mappings
-					err = c.DeletePortMapping("", uint16(host.Current.ListenPort), "UDP")
+					err = c.DeletePortMapping("", uint16(vpn.Current.ListenPort), "UDP")
 					if err != nil {
 						log.Error("Error deleting port mapping, %v", err)
 					}
 
-					log.Infof("***UPNP*** AddPortMapping: %d %s %d %s %s", host.Current.ListenPort, "UDP", host.Current.ListenPort, localAddr.IP.String(), host.Name+"-"+host.NetName)
+					log.Infof("***UPNP*** AddPortMapping: %d %s %d %s %s", vpn.Current.ListenPort, "UDP", vpn.Current.ListenPort, localAddr.IP.String(), vpn.Name+"-"+vpn.NetName)
 					// add port mapping
-					err = c.AddPortMapping("", uint16(host.Current.ListenPort), "UDP", uint16(host.Current.ListenPort), localAddr.IP.String(), true, host.Name+"-"+host.NetName, 0)
+					err = c.AddPortMapping("", uint16(vpn.Current.ListenPort), "UDP", uint16(vpn.Current.ListenPort), localAddr.IP.String(), true, vpn.Name+"-"+vpn.NetName, 0)
 					if err != nil {
 						log.Error("Error adding port mapping, %v", err)
 					}
@@ -100,7 +100,7 @@ func ConfigureUPnP(host model.Host) error {
 
 		for _, c := range ppp {
 
-			if host.Current.ListenPort != 0 && host.Current.Endpoint != "" {
+			if vpn.Current.ListenPort != 0 && vpn.Current.Endpoint != "" {
 				// get local ip address
 				conn, err := net.Dial("udp", "8.8.8.8:53")
 				if err != nil {
@@ -116,24 +116,24 @@ func ConfigureUPnP(host model.Host) error {
 					} else {
 						log.Infof("***UPNP***PPP External IP address: %s", externalIP)
 						// compare the externalIP to the endpoint
-						parts := strings.Split(host.Current.Endpoint, ":")
+						parts := strings.Split(vpn.Current.Endpoint, ":")
 						if parts[0] != externalIP && !isBogon(externalIP) {
 							log.Error("PPP External IP address does not match endpoint")
-							// Update the host endpoint at nettica
-							host.Current.Endpoint = externalIP + ":" + parts[1]
-							UpdateHost(host)
+							// Update the vpn endpoint at nettica
+							vpn.Current.Endpoint = externalIP + ":" + parts[1]
+							UpdateVPN(vpn)
 						}
 					}
 
 					// delete any old port mappings
-					err = c.DeletePortMapping("", uint16(host.Current.ListenPort), "UDP")
+					err = c.DeletePortMapping("", uint16(vpn.Current.ListenPort), "UDP")
 					if err != nil {
 						log.Error("PPP Error deleting port mapping, %v", err)
 					}
 
-					log.Infof("***UPNP***PPP AddPortMapping: %d %s %d %s %s", host.Current.ListenPort, "UDP", host.Current.ListenPort, localAddr.IP.String(), host.Name+"-"+host.NetName)
+					log.Infof("***UPNP***PPP AddPortMapping: %d %s %d %s %s", vpn.Current.ListenPort, "UDP", vpn.Current.ListenPort, localAddr.IP.String(), vpn.Name+"-"+vpn.NetName)
 					// add port mapping
-					err = c.AddPortMapping("", uint16(host.Current.ListenPort), "UDP", uint16(host.Current.ListenPort), localAddr.IP.String(), true, host.Name+"-"+host.NetName, 0)
+					err = c.AddPortMapping("", uint16(vpn.Current.ListenPort), "UDP", uint16(vpn.Current.ListenPort), localAddr.IP.String(), true, vpn.Name+"-"+vpn.NetName, 0)
 					if err != nil {
 						log.Error("PPP Error adding port mapping, %v", err)
 					}

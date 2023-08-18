@@ -62,8 +62,8 @@ func StartDNS() error {
 
 	for i := 0; i < len(msg.Config); i++ {
 		index := -1
-		for j := 0; j < len(msg.Config[i].Hosts); j++ {
-			if msg.Config[i].Hosts[j].HostGroup == config.DeviceID {
+		for j := 0; j < len(msg.Config[i].VPNs); j++ {
+			if msg.Config[i].VPNs[j].DeviceID == config.DeviceID {
 				index = j
 				break
 			}
@@ -71,8 +71,8 @@ func StartDNS() error {
 		if index == -1 {
 			log.Errorf("Error reading message %v", msg)
 		} else {
-			if msg.Config[i].Hosts[index].Enable && msg.Config[i].Hosts[index].Current.EnableDns {
-				host := msg.Config[i].Hosts[index]
+			if msg.Config[i].VPNs[index].Enable && msg.Config[i].VPNs[index].Current.EnableDns {
+				host := msg.Config[i].VPNs[index]
 				name := strings.ToLower(host.Name)
 				log.Infof("label = %s addr = %v", name, host.Current.Address)
 				DnsTable[name] = append(DnsTable[name], host.Current.Address...)
@@ -87,23 +87,23 @@ func StartDNS() error {
 					DnsTable[label] = []string{name}
 					log.Infof("label = %s name = %s", label, name)
 				}
-				msg.Config[i].Hosts = append(msg.Config[i].Hosts[:index], msg.Config[i].Hosts[index+1:]...)
-				for j := 0; j < len(msg.Config[i].Hosts); j++ {
-					n := strings.ToLower(msg.Config[i].Hosts[j].Name)
-					if strings.Contains(msg.Config[i].Hosts[j].Current.Address[0], ":") {
+				msg.Config[i].VPNs = append(msg.Config[i].VPNs[:index], msg.Config[i].VPNs[index+1:]...)
+				for j := 0; j < len(msg.Config[i].VPNs); j++ {
+					n := strings.ToLower(msg.Config[i].VPNs[j].Name)
+					if strings.Contains(msg.Config[i].VPNs[j].Current.Address[0], ":") {
 						// ipv6
 					} else {
 						// ipv4
-						addresses := strings.Split(msg.Config[i].Hosts[j].Current.Address[0], "/")
+						addresses := strings.Split(msg.Config[i].VPNs[j].Current.Address[0], "/")
 						address := addresses[0]
 						digits := strings.Split(address, ".")
 						label := fmt.Sprintf("%s.%s.%s.%s.in-addr.arpa", digits[3], digits[2], digits[1], digits[0])
 						DnsTable[label] = []string{n}
 					}
-					log.Infof("label = %s name = %v", n, msg.Config[i].Hosts[j].Current.Address)
-					DnsTable[n] = append(DnsTable[n], msg.Config[i].Hosts[j].Current.Address...)
-					if msg.Config[i].Hosts[j].Current.Endpoint != "" {
-						ip_port := msg.Config[i].Hosts[j].Current.Endpoint
+					log.Infof("label = %s name = %v", n, msg.Config[i].VPNs[j].Current.Address)
+					DnsTable[n] = append(DnsTable[n], msg.Config[i].VPNs[j].Current.Address...)
+					if msg.Config[i].VPNs[j].Current.Endpoint != "" {
+						ip_port := msg.Config[i].VPNs[j].Current.Endpoint
 						parts := strings.Split(ip_port, ":")
 						ip := parts[0]
 						ServerTable[ip] = ip
@@ -134,8 +134,8 @@ func UpdateDNS(msg model.Message) error {
 
 	for i := 0; i < len(msg.Config); i++ {
 		index := -1
-		for j := 0; j < len(msg.Config[i].Hosts); j++ {
-			if msg.Config[i].Hosts[j].HostGroup == config.DeviceID {
+		for j := 0; j < len(msg.Config[i].VPNs); j++ {
+			if msg.Config[i].VPNs[j].DeviceID == config.DeviceID {
 				index = j
 				break
 			}
@@ -144,8 +144,8 @@ func UpdateDNS(msg model.Message) error {
 			log.Errorf("Error reading message for DNS update: %v", msg)
 			return errors.New("Error reading message")
 		} else {
-			if msg.Config[i].Hosts[index].Enable && msg.Config[i].Hosts[index].Current.EnableDns {
-				host := msg.Config[i].Hosts[index]
+			if msg.Config[i].VPNs[index].Enable && msg.Config[i].VPNs[index].Current.EnableDns {
+				host := msg.Config[i].VPNs[index]
 				name := strings.ToLower(host.Name)
 				dnsTable[name] = append(dnsTable[name], host.Current.Address...)
 				if strings.Contains(host.Current.Address[0], ":") {
@@ -161,22 +161,22 @@ func UpdateDNS(msg model.Message) error {
 
 				}
 				dnsTable[name] = append(dnsTable[name], host.Current.Address...)
-				msg.Config[i].Hosts = append(msg.Config[i].Hosts[:index], msg.Config[i].Hosts[index+1:]...)
-				for j := 0; j < len(msg.Config[i].Hosts); j++ {
-					n := strings.ToLower(msg.Config[i].Hosts[j].Name)
-					if strings.Contains(msg.Config[i].Hosts[j].Current.Address[0], ":") {
+				msg.Config[i].VPNs = append(msg.Config[i].VPNs[:index], msg.Config[i].VPNs[index+1:]...)
+				for j := 0; j < len(msg.Config[i].VPNs); j++ {
+					n := strings.ToLower(msg.Config[i].VPNs[j].Name)
+					if strings.Contains(msg.Config[i].VPNs[j].Current.Address[0], ":") {
 						// ipv6
 					} else {
 						// ipv4
-						addresses := strings.Split(msg.Config[i].Hosts[j].Current.Address[0], "/")
+						addresses := strings.Split(msg.Config[i].VPNs[j].Current.Address[0], "/")
 						address := addresses[0]
 						digits := strings.Split(address, ".")
 						label := fmt.Sprintf("%s.%s.%s.%s.in-addr.arpa", digits[3], digits[2], digits[1], digits[0])
 						dnsTable[label] = []string{n}
 					}
-					dnsTable[n] = append(dnsTable[n], msg.Config[i].Hosts[j].Current.Address...)
-					if msg.Config[i].Hosts[j].Current.Endpoint != "" {
-						ip_port := msg.Config[i].Hosts[j].Current.Endpoint
+					dnsTable[n] = append(dnsTable[n], msg.Config[i].VPNs[j].Current.Address...)
+					if msg.Config[i].VPNs[j].Current.Endpoint != "" {
+						ip_port := msg.Config[i].VPNs[j].Current.Endpoint
 						parts := strings.Split(ip_port, ":")
 						ip := parts[0]
 						serverTable[ip] = ip

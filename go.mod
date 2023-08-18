@@ -1,13 +1,13 @@
 module nettica-client
 
-go 1.20
+go 1.19
 
 require (
 	github.com/huin/goupnp v1.2.0
 	github.com/miekg/dns v1.1.55
-	github.com/nettica-com/nettica-admin v0.0.0-20230718094308-0b772af44ef7
+	github.com/nettica-com/nettica-admin v0.0.0-20230818210243-1dc8301003be
 	github.com/sirupsen/logrus v1.9.3
-	golang.org/x/sys v0.10.0
+	golang.org/x/sys v0.11.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
 )
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -42,10 +43,10 @@ func StartChannel(c chan []byte) {
 
 func CallNettica(etag *string) ([]byte, error) {
 
-	host := config.Host
+	vpn := config.Host
 	var client *http.Client
 
-	if strings.HasPrefix(host, "http:") {
+	if strings.HasPrefix(vpn, "http:") {
 		client = &http.Client{
 			Timeout: time.Second * 10,
 		}
@@ -66,7 +67,7 @@ func CallNettica(etag *string) ([]byte, error) {
 
 	}
 
-	var reqURL string = fmt.Sprintf(netticaHostAPIFmt, host, config.DeviceID)
+	var reqURL string = fmt.Sprintf(netticaHostAPIFmt, vpn, config.DeviceID)
 	if !config.Quiet {
 		log.Infof("  GET %s", reqURL)
 	}
@@ -135,43 +136,8 @@ func GetNetticaConfig(etag string) (string, error) {
 	body, err := CallNettica(&etag)
 	if err != nil {
 		if err.Error() == "Unauthorized" {
-			log.Errorf("Unauthorized - looking for another API key")
+			log.Errorf("Unauthorized - reload config")
 			// Read the config and find another API key
-			buffer, err := ioutil.ReadFile(GetDataPath() + "nettica.json")
-			if err == nil {
-				var conf model.Message
-				err = json.Unmarshal(buffer, &conf)
-				if err == nil {
-					found := false
-					for _, net := range conf.Config {
-						for _, host := range net.Hosts {
-
-							if host.HostGroup == config.DeviceID && host.APIKey != config.ApiKey {
-								config.ApiKey = host.APIKey
-								saveConfig()
-								log.Infof("Trying %s %s", host.HostGroup, host.APIKey)
-								body, err = CallNettica(&etag)
-								if err == nil {
-									log.Infof("Found working API key - etag %s", etag)
-									found = true
-									UpdateNetticaConfig(body)
-									return etag, nil
-									break
-								}
-							}
-						}
-					}
-					if !found {
-						if len(conf.Config) == 1 {
-							// Only one net and getting a 401, so lets delete that net too
-							err = os.Remove(GetDataPath() + "nettica.json")
-							if err != nil {
-								log.Errorf("Failed to delete nettica.json")
-							}
-						}
-					}
-				}
-			}
 			// pick up any changes from the agent or manually editing the config file.
 			reloadConfig()
 
@@ -186,9 +152,9 @@ func GetNetticaConfig(etag string) (string, error) {
 	return "", err
 }
 
-func UpdateHost(host model.Host) error {
+func UpdateVPN(vpn model.VPN) error {
 
-	log.Infof("UPDATING HOST: %v", host)
+	log.Infof("UPDATING VPN: %v", vpn)
 	server := config.Host
 	var client *http.Client
 
@@ -213,9 +179,9 @@ func UpdateHost(host model.Host) error {
 
 	}
 
-	var reqURL string = fmt.Sprintf(netticaHostUpdateAPIFmt, server, host.Id)
+	var reqURL string = fmt.Sprintf(netticaHostUpdateAPIFmt, server, vpn.Id)
 	log.Infof("  PATCH %s", reqURL)
-	content, err := json.Marshal(host)
+	content, err := json.Marshal(vpn)
 	if err != nil {
 		return err
 	}
@@ -225,7 +191,7 @@ func UpdateHost(host model.Host) error {
 		return err
 	}
 	if req != nil {
-		req.Header.Set("X-API-KEY", host.APIKey)
+		req.Header.Set("X-API-KEY", config.ApiKey)
 		req.Header.Set("User-Agent", "nettica-client/2.0")
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -235,7 +201,7 @@ func UpdateHost(host model.Host) error {
 		if resp.StatusCode != 200 {
 			log.Errorf("PATCH Error: Response %v", resp.StatusCode)
 		} else {
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				log.Errorf("error reading body %v", err)
 			}
@@ -339,9 +305,9 @@ func UpdateNetticaConfig(body []byte) {
 				StopWireguard(oldconf.Config[i].NetName)
 				os.Remove(GetDataPath() + oldconf.Config[i].NetName + ".conf")
 
-				for _, host := range oldconf.Config[i].Hosts {
-					if host.HostGroup == config.DeviceID {
-						KeyDelete(host.Current.PublicKey)
+				for _, vpn := range oldconf.Config[i].VPNs {
+					if vpn.DeviceID == config.DeviceID {
+						KeyDelete(vpn.Current.PublicKey)
 						KeySave()
 					}
 				}
@@ -351,8 +317,8 @@ func UpdateNetticaConfig(body []byte) {
 		// handle any other changes
 		for i := 0; i < len(msg.Config); i++ {
 			index := -1
-			for j := 0; j < len(msg.Config[i].Hosts); j++ {
-				if msg.Config[i].Hosts[j].HostGroup == config.DeviceID {
+			for j := 0; j < len(msg.Config[i].VPNs); j++ {
+				if msg.Config[i].VPNs[j].DeviceID == config.DeviceID {
 					index = j
 					break
 				}
@@ -360,15 +326,15 @@ func UpdateNetticaConfig(body []byte) {
 			if index == -1 {
 				log.Errorf("Error reading message %v", msg)
 			} else {
-				host := msg.Config[i].Hosts[index]
-				msg.Config[i].Hosts = append(msg.Config[i].Hosts[:index], msg.Config[i].Hosts[index+1:]...)
+				vpn := msg.Config[i].VPNs[index]
+				msg.Config[i].VPNs = append(msg.Config[i].VPNs[:index], msg.Config[i].VPNs[index+1:]...)
 
 				// Configure UPnP as needed
-				go ConfigureUPnP(host)
+				go ConfigureUPnP(vpn)
 
 				// If any of the AllowedIPs contain our subnet, remove that entry
-				for k := 0; k < len(msg.Config[i].Hosts); k++ {
-					allowed := msg.Config[i].Hosts[k].Current.AllowedIPs
+				for k := 0; k < len(msg.Config[i].VPNs); k++ {
+					allowed := msg.Config[i].VPNs[k].Current.AllowedIPs
 					for l := 0; l < len(allowed); l++ {
 						inSubnet := false
 						_, s, _ := net.ParseCIDR(allowed[l])
@@ -378,44 +344,44 @@ func UpdateNetticaConfig(body []byte) {
 							}
 						}
 						if inSubnet {
-							msg.Config[i].Hosts[k].Current.AllowedIPs = append(allowed[:l], allowed[l+1:]...)
+							msg.Config[i].VPNs[k].Current.AllowedIPs = append(allowed[:l], allowed[l+1:]...)
 						}
 					}
 				}
 
 				// Check to see if we have the private key
 
-				key, found := KeyLookup(host.Current.PublicKey)
+				key, found := KeyLookup(vpn.Current.PublicKey)
 				if !found {
-					KeyAdd(host.Current.PublicKey, host.Current.PrivateKey)
+					KeyAdd(vpn.Current.PublicKey, vpn.Current.PrivateKey)
 					err = KeySave()
 					if err != nil {
-						log.Errorf("Error saving key: %s %s", host.Current.PublicKey, host.Current.PrivateKey)
+						log.Errorf("Error saving key: %s %s", vpn.Current.PublicKey, vpn.Current.PrivateKey)
 					}
-					key, _ = KeyLookup(host.Current.PublicKey)
+					key, _ = KeyLookup(vpn.Current.PublicKey)
 				}
 
 				// If the private key is blank create a new one and update the server
 				if key == "" {
 					// delete the old public key
-					KeyDelete(host.Current.PublicKey)
+					KeyDelete(vpn.Current.PublicKey)
 					wg, _ := wgtypes.GeneratePrivateKey()
-					host.Current.PrivateKey = wg.String()
-					host.Current.PublicKey = wg.PublicKey().String()
-					KeyAdd(host.Current.PublicKey, host.Current.PrivateKey)
+					vpn.Current.PrivateKey = wg.String()
+					vpn.Current.PublicKey = wg.PublicKey().String()
+					KeyAdd(vpn.Current.PublicKey, vpn.Current.PrivateKey)
 					KeySave()
 
-					host2 := host
-					host2.Current.PrivateKey = ""
+					vpn2 := vpn
+					vpn2.Current.PrivateKey = ""
 
 					// Update nettica with the new public key
-					UpdateHost(host2)
+					UpdateVPN(vpn2)
 
 				} else {
-					host.Current.PrivateKey = key
+					vpn.Current.PrivateKey = key
 				}
 
-				text, err := DumpWireguardConfig(&host, &(msg.Config[i].Hosts))
+				text, err := DumpWireguardConfig(&vpn, &(msg.Config[i].VPNs))
 				if err != nil {
 					log.Errorf("error on template: %s", err)
 				}
@@ -452,7 +418,7 @@ func UpdateNetticaConfig(body []byte) {
 						log.Errorf("Error writing file %s : %s", path+msg.Config[i].NetName+".conf", err)
 					}
 
-					if !host.Enable {
+					if !vpn.Enable {
 						// Host was disabled when we stopped wireguard above
 						log.Infof("Net %s is disabled.  Stopped service if running.", msg.Config[i].NetName)
 						// Stopping the service doesn't seem very reliable, stop it again
@@ -531,8 +497,8 @@ func StartBackgroundRefreshService() {
 
 		for i := 0; i < len(msg.Config); i++ {
 			index := -1
-			for j := 0; j < len(msg.Config[i].Hosts); j++ {
-				if msg.Config[i].Hosts[j].HostGroup == config.DeviceID {
+			for j := 0; j < len(msg.Config[i].VPNs); j++ {
+				if msg.Config[i].VPNs[j].DeviceID == config.DeviceID {
 					index = j
 					break
 				}
@@ -540,15 +506,15 @@ func StartBackgroundRefreshService() {
 			if index == -1 {
 				log.Errorf("Error reading message %v", msg)
 			} else {
-				host := msg.Config[i].Hosts[index]
-				msg.Config[i].Hosts = append(msg.Config[i].Hosts[:index], msg.Config[i].Hosts[index+1:]...)
+				vpn := msg.Config[i].VPNs[index]
+				msg.Config[i].VPNs = append(msg.Config[i].VPNs[:index], msg.Config[i].VPNs[index+1:]...)
 
 				// Configure UPnP as needed
-				go ConfigureUPnP(host)
+				go ConfigureUPnP(vpn)
 
 				// If any of the AllowedIPs contain our subnet, remove that entry
-				for k := 0; k < len(msg.Config[i].Hosts); k++ {
-					allowed := msg.Config[i].Hosts[k].Current.AllowedIPs
+				for k := 0; k < len(msg.Config[i].VPNs); k++ {
+					allowed := msg.Config[i].VPNs[k].Current.AllowedIPs
 					for l := 0; l < len(allowed); l++ {
 						inSubnet := false
 						_, s, _ := net.ParseCIDR(allowed[l])
@@ -558,43 +524,43 @@ func StartBackgroundRefreshService() {
 							}
 						}
 						if inSubnet {
-							msg.Config[i].Hosts[k].Current.AllowedIPs = append(allowed[:l], allowed[l+1:]...)
+							msg.Config[i].VPNs[k].Current.AllowedIPs = append(allowed[:l], allowed[l+1:]...)
 						}
 					}
 				}
 				// Check to see if we have the private key
 
-				key, found := KeyLookup(host.Current.PublicKey)
+				key, found := KeyLookup(vpn.Current.PublicKey)
 				if !found {
-					KeyAdd(host.Current.PublicKey, host.Current.PrivateKey)
+					KeyAdd(vpn.Current.PublicKey, vpn.Current.PrivateKey)
 					err = KeySave()
 					if err != nil {
-						log.Errorf("Error saving key: %s %s", host.Current.PublicKey, host.Current.PrivateKey)
+						log.Errorf("Error saving key: %s %s", vpn.Current.PublicKey, vpn.Current.PrivateKey)
 					}
-					key, _ = KeyLookup(host.Current.PublicKey)
+					key, _ = KeyLookup(vpn.Current.PublicKey)
 				}
 
 				// If the private key is blank create a new one and update the server
 				if key == "" {
 					// delete the old public key
-					KeyDelete(host.Current.PublicKey)
+					KeyDelete(vpn.Current.PublicKey)
 					wg, _ := wgtypes.GeneratePrivateKey()
-					host.Current.PrivateKey = wg.String()
-					host.Current.PublicKey = wg.PublicKey().String()
-					KeyAdd(host.Current.PublicKey, host.Current.PrivateKey)
+					vpn.Current.PrivateKey = wg.String()
+					vpn.Current.PublicKey = wg.PublicKey().String()
+					KeyAdd(vpn.Current.PublicKey, vpn.Current.PrivateKey)
 					KeySave()
 
-					host2 := host
-					host2.Current.PrivateKey = ""
+					vpn2 := vpn
+					vpn2.Current.PrivateKey = ""
 
 					// Update nettica with the new public key
-					UpdateHost(host2)
+					UpdateVPN(vpn2)
 
 				} else {
-					host.Current.PrivateKey = key
+					vpn.Current.PrivateKey = key
 				}
 
-				text, err := DumpWireguardConfig(&host, &(msg.Config[i].Hosts))
+				text, err := DumpWireguardConfig(&vpn, &(msg.Config[i].VPNs))
 				if err != nil {
 					log.Errorf("error on template: %s", err)
 				}
@@ -604,7 +570,7 @@ func StartBackgroundRefreshService() {
 					log.Errorf("Error writing file %s : %s", path+msg.Config[i].NetName+".conf", err)
 				}
 
-				if !host.Enable {
+				if !vpn.Enable {
 					StopWireguard(msg.Config[i].NetName)
 					log.Infof("Net %s is disabled.  Stopped service if running.", msg.Config[i].NetName)
 				} else {
@@ -669,10 +635,6 @@ func DoWork() {
 
 		}
 	}()
-}
-
-func getStatistics() error {
-	return nil
 }
 
 func calculateCurrentTimestamp() int64 {

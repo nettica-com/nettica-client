@@ -2,13 +2,10 @@ package main
 
 import (
 	"bytes"
-	"os"
-	"path/filepath"
 	"strings"
 	"text/template"
 
 	model "github.com/nettica-com/nettica-admin/model"
-	util "github.com/nettica-com/nettica-admin/util"
 )
 
 var (
@@ -43,7 +40,7 @@ PreUp = {{ .Server.PreUp }}
 PostUp = {{ .Server.PostUp }}
 PreDown = {{ .Server.PreDown }}
 PostDown = {{ .Server.PostDown }}
-{{- range .Hosts }}
+{{- range .VPNs }}
 {{ if .Enable -}}
 # {{.Name}} / {{.Email}} / Updated: {{.Updated}} / Created: {{.Created}}
 [Peer]
@@ -53,26 +50,26 @@ AllowedIPs = {{ StringsJoin .Current.Address ", " }}
 {{- end }}
 {{ end }}`
 
-	wireguardTemplate = `{{ if .Host.Enable }}
-# {{.Host.Name }} / {{ .Host.Email }} / Updated: {{ .Host.Updated }} / Created: {{ .Host.Created }}
+	wireguardTemplate = `{{ if .Vpn.Enable }}
+# {{.Vpn.Name }} / Updated: {{ .Vpn.Updated }} / Created: {{ .Vpn.Created }}
 [Interface]
-  {{- range .Host.Current.Address }}
+  {{- range .Vpn.Current.Address }}
 Address = {{ . }}
   {{- end }}
-PrivateKey = {{ .Host.Current.PrivateKey }}
-{{ $server := .Host.Current.Endpoint -}}
-{{ if ne .Host.Current.ListenPort 0 -}}ListenPort = {{ .Host.Current.ListenPort }}{{- end}}
-{{ if .Host.Current.Dns }}DNS = {{ StringsJoin .Host.Current.Dns ", " }}{{ end }}
-{{ if .Host.Current.Table }}Table = {{ .Host.Current.Table }}{{- end}}
-{{ if ne .Host.Current.Mtu 0 -}}MTU = {{.Host.Current.Mtu}}{{- end}}
-{{ if .Host.Current.PreUp -}}PreUp = {{ .Host.Current.PreUp }}{{- end}}
-{{ if .Host.Current.PostUp -}}PostUp = {{ .Host.Current.PostUp }}{{- end}}
-{{ if .Host.Current.PreDown -}}PreDown = {{ .Host.Current.PreDown }}{{- end}}
-{{ if .Host.Current.PostDown -}}PostDown = {{ .Host.Current.PostDown }}{{- end}}
-{{ range .Hosts -}}
+PrivateKey = {{ .Vpn.Current.PrivateKey }}
+{{ $server := .Vpn.Current.Endpoint -}}
+{{ if ne .Vpn.Current.ListenPort 0 -}}ListenPort = {{ .Vpn.Current.ListenPort }}{{- end}}
+{{ if .Vpn.Current.Dns }}DNS = {{ StringsJoin .Vpn.Current.Dns ", " }}{{ end }}
+{{ if .Vpn.Current.Table }}Table = {{ .Vpn.Current.Table }}{{- end}}
+{{ if ne .Vpn.Current.Mtu 0 -}}MTU = {{.Vpn.Current.Mtu}}{{- end}}
+{{ if .Vpn.Current.PreUp -}}PreUp = {{ .Vpn.Current.PreUp }}{{- end}}
+{{ if .Vpn.Current.PostUp -}}PostUp = {{ .Vpn.Current.PostUp }}{{- end}}
+{{ if .Vpn.Current.PreDown -}}PreDown = {{ .Vpn.Current.PreDown }}{{- end}}
+{{ if .Vpn.Current.PostDown -}}PostDown = {{ .Vpn.Current.PostDown }}{{- end}}
+{{ range .VPNs -}}
 {{ if .Enable -}}
 {{ if $server }}
-# {{.Name}} / {{.Email}} / Updated: {{.Updated}} / Created: {{.Created}}
+# {{.Name}} / Updated: {{.Updated}} / Created: {{.Created}}
 [Peer]
 PublicKey = {{ .Current.PublicKey }}
 PresharedKey = {{ .Current.PresharedKey }}
@@ -96,61 +93,35 @@ AllowedIPs = {{ StringsJoin .Current.AllowedIPs ", " }}
 )
 
 // DumpWireguardConfig using go template
-func DumpWireguardConfig(host *model.Host, hosts *[]model.Host) ([]byte, error) {
+func DumpWireguardConfig(vpn *model.VPN, VPNs *[]model.VPN) ([]byte, error) {
 	t, err := template.New("wireguard").Funcs(template.FuncMap{"StringsJoin": strings.Join}).Parse(wireguardTemplate)
 	if err != nil {
 		return nil, err
 	}
 
 	return dump(t, struct {
-		Host  *model.Host
-		Hosts *[]model.Host
+		Vpn  *model.VPN
+		VPNs *[]model.VPN
 	}{
-		Host:  host,
-		Hosts: hosts,
+		Vpn:  vpn,
+		VPNs: VPNs,
 	})
 }
 
 // DumpClientWg dump client wg config with go template
-func DumpClientWg(host *model.Host, server *model.Server) ([]byte, error) {
+func DumpClientWg(vpn *model.VPN, server *model.Server) ([]byte, error) {
 	t, err := template.New("client").Funcs(template.FuncMap{"StringsJoin": strings.Join}).Parse(clientTpl)
 	if err != nil {
 		return nil, err
 	}
 
 	return dump(t, struct {
-		Host   *model.Host
+		Vpn    *model.VPN
 		Server *model.Server
 	}{
-		Host:   host,
+		Vpn:    vpn,
 		Server: server,
 	})
-}
-
-// DumpServerWg dump server wg config with go template, write it to file and return bytes
-func DumpServerWg(hosts []*model.Host, server *model.Server) ([]byte, error) {
-	t, err := template.New("server").Funcs(template.FuncMap{"StringsJoin": strings.Join}).Parse(wgTpl)
-	if err != nil {
-		return nil, err
-	}
-
-	configDataWg, err := dump(t, struct {
-		Hosts  []*model.Host
-		Server *model.Server
-	}{
-		Hosts:  hosts,
-		Server: server,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	err = util.WriteFile(filepath.Join(os.Getenv("WG_CONF_DIR"), os.Getenv("WG_INTERFACE_NAME")), configDataWg)
-	if err != nil {
-		return nil, err
-	}
-
-	return configDataWg, nil
 }
 
 func dump(tpl *template.Template, data interface{}) ([]byte, error) {
