@@ -26,30 +26,6 @@ Endpoint = {{ .Server.Endpoint }}
 PersistentKeepalive = {{.Host.Current.PersistentKeepalive}}
 `
 
-	wgTpl = `# Updated: {{ .Server.Updated }} / Created: {{ .Server.Created }}
-[Interface]
-{{- range .Server.Address }}
-Address = {{ . }}
-{{- end }}
-ListenPort = {{ .Server.ListenPort }}
-PrivateKey = {{ .Server.PrivateKey }}
-{{ if ne .Server.Mtu 0 -}}
-MTU = {{.Server.Mtu}}
-{{- end}}
-PreUp = {{ .Server.PreUp }}
-PostUp = {{ .Server.PostUp }}
-PreDown = {{ .Server.PreDown }}
-PostDown = {{ .Server.PostDown }}
-{{- range .VPNs }}
-{{ if .Enable -}}
-# {{.Name}} / {{.Email}} / Updated: {{.Updated}} / Created: {{.Created}}
-[Peer]
-PublicKey = {{ .Current.PublicKey }}
-PresharedKey = {{ .Current.PresharedKey }}
-AllowedIPs = {{ StringsJoin .Current.Address ", " }}
-{{- end }}
-{{ end }}`
-
 	wireguardTemplate = `{{ if .Vpn.Enable }}
 # {{.Vpn.Name }} / Updated: {{ .Vpn.Updated }} / Created: {{ .Vpn.Created }}
 [Interface]

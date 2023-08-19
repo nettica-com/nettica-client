@@ -3,27 +3,21 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"io/ioutil"
 	"net"
 	"os"
+	"runtime"
 
+	"github.com/nettica-com/nettica-admin/model"
 	log "github.com/sirupsen/logrus"
 )
 
-var config struct {
-	Quiet         bool
-	Host          string
-	DeviceID      string
-	ApiKey        string
-	ServiceGroup  string
-	ServiceApiKey string
-	CheckInterval int64
-	SourceAddress string
-	sourceAddr    *net.TCPAddr
-	Debug         bool
-	init          bool
-	loaded        bool
-	path          *string
+var device model.Device = model.Device{}
+
+var cfg struct {
+	sourceAddr *net.TCPAddr
+	init       bool
+	loaded     bool
+	path       *string
 }
 
 type configError struct {
@@ -36,64 +30,66 @@ func (err *configError) Error() string {
 
 func saveConfig() error {
 	log.Info("Saving config")
-	if config.path == nil {
+	if cfg.path == nil {
 		return nil
 	}
-	data, err := json.Marshal(config)
+	data, err := json.Marshal(device)
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(GetDataPath()+*config.path, data, 0600)
+	return os.WriteFile(GetDataPath()+*cfg.path, data, 0600)
 }
 
 func reloadConfig() error {
 	log.Info("Reloading config")
-	if config.path == nil {
+	if cfg.path == nil {
 		return nil
 	}
-	data, err := ioutil.ReadFile(GetDataPath() + *config.path)
+	data, err := os.ReadFile(GetDataPath() + *cfg.path)
 	if err != nil {
 		return err
 	}
-	json.Unmarshal(data, &config)
+	json.Unmarshal(data, &device)
 
-	log.Infof("Host: %s", config.Host)
-	log.Infof("DeviceID: %s", config.DeviceID)
-	log.Infof("ApiKey: %s", config.ApiKey)
-	log.Infof("Quiet: %t", config.Quiet)
+	log.Infof("Server:   %s", device.Server)
+	log.Infof("DeviceID: %s", device.Id)
+	log.Infof("ApiKey:   %s", device.ApiKey)
+	log.Infof("Quiet:    %t", device.Quiet)
 
 	return nil
 }
 
 func loadConfig() error {
 
-	if config.loaded {
+	if cfg.loaded {
 		return nil
 	}
 
-	if !config.init {
-		config.init = true
+	if !cfg.init {
+		cfg.init = true
 
 		// configure defaults
-		config.Debug = false
-		config.Quiet = false
-		config.CheckInterval = 10
-		config.SourceAddress = "0.0.0.0"
+		device.Debug = false
+		device.Quiet = false
+		device.CheckInterval = 10
+		device.SourceAddress = "0.0.0.0"
+		device.OS = runtime.GOOS
+		device.Architecture = runtime.GOARCH
 
 		// load defaults from environment
-		config.Host = os.Getenv("NETTICA_HOST")
-		config.DeviceID = os.Getenv("NETTICA_HOST_ID")
-		config.ApiKey = os.Getenv("NETTICA_API_KEY")
-		config.ServiceGroup = os.Getenv("NETTICA_SERVICE_GROUP")
-		config.ServiceApiKey = os.Getenv("NETTICA_SERVICE_API_KEY")
+		device.Server = os.Getenv("NETTICA_SERVER")
+		device.Id = os.Getenv("NETTICA_DEVICE_ID")
+		device.ApiKey = os.Getenv("NETTICA_API_KEY")
+		device.ServiceGroup = os.Getenv("NETTICA_SERVICE_GROUP")
+		device.ServiceApiKey = os.Getenv("NETTICA_SERVICE_API_KEY")
 
-		if config.Host == "" {
-			config.Host = "https://my.nettica.com"
+		if device.Server == "" {
+			device.Server = "https://my.nettica.com"
 		}
 
 		// pick up command line arguments
-		config.path = flag.String("C", "nettica.conf", "Path to configuration file")
-		Host := flag.String("server", "", "Nettica server to connect to")
+		cfg.path = flag.String("C", "nettica.conf", "Path to configuration file")
+		Server := flag.String("server", "", "Nettica server to connect to")
 		DeviceID := flag.String("DeviceID", "", "Host ID to use")
 		ServiceGroup := flag.String("servicegroup", "", "Service group to use")
 		ServiceApiKey := flag.String("serviceapikey", "", "Service API key to use")
@@ -106,80 +102,80 @@ func loadConfig() error {
 
 		// Open the config file specified
 
-		file, err := os.Open(GetDataPath() + *config.path)
-		if err != nil && *Host == "" && *DeviceID == "" && *ApiKey == "" && config.DeviceID == "" && config.ApiKey == "" {
+		file, err := os.Open(GetDataPath() + *cfg.path)
+		if err != nil && *Server == "" && *DeviceID == "" && *ApiKey == "" && device.Id == "" && device.ApiKey == "" {
 			return err
 		}
 
 		// If we could open the config read it, otherwise go with cmd line args
 		if err == nil {
 			decoder := json.NewDecoder(file)
-			err = decoder.Decode(&config)
+			err = decoder.Decode(&device)
 			if err != nil {
 				return err
 			}
 		}
 
 		if *quiet {
-			config.Quiet = *quiet
+			device.Quiet = *quiet
 		}
 
-		if *Host != "" {
-			config.Host = *Host
+		if *Server != "" {
+			device.Server = *Server
 		}
 		if *DeviceID != "" {
-			config.DeviceID = *DeviceID
+			device.Id = *DeviceID
 		}
 		if *ApiKey != "" {
-			config.ApiKey = *ApiKey
+			device.ApiKey = *ApiKey
 		}
 
 		if *ServiceGroup != "" {
-			config.ServiceGroup = *ServiceGroup
+			device.ServiceGroup = *ServiceGroup
 		}
 		if *ServiceApiKey != "" {
-			config.ServiceApiKey = *ServiceApiKey
+			device.ServiceApiKey = *ServiceApiKey
 		}
 
-		if config.Host == "" {
-			return &configError{"A nettica.conf file with a Host parameter is required"}
+		if device.Server == "" {
+			return &configError{"A nettica.conf file with a Server parameter is required"}
 		}
 
 		if *CheckInterval != 0 {
-			config.CheckInterval = *CheckInterval
+			device.CheckInterval = *CheckInterval
 		}
 
 		if *sourceStr != "" {
-			config.SourceAddress = *sourceStr
+			device.SourceAddress = *sourceStr
 		}
 
-		config.sourceAddr, err = net.ResolveTCPAddr("tcp", config.SourceAddress+":0")
+		cfg.sourceAddr, err = net.ResolveTCPAddr("tcp", device.SourceAddress+":0")
 		if err != nil {
 			return err
 		}
-		config.loaded = true
-		log.Infof("Host:   %s", config.Host)
-		log.Infof("DeviceID: %s", config.DeviceID)
-		log.Infof("ApiKey: %s", config.ApiKey)
-		log.Infof("Quiet:  %t", config.Quiet)
+		cfg.loaded = true
+		log.Infof("Server:   %s", device.Server)
+		log.Infof("DeviceID: %s", device.Id)
+		log.Infof("ApiKey:   %s", device.ApiKey)
+		log.Infof("Quiet:    %t", device.Quiet)
 
 	} else {
-		file, err := os.Open(GetDataPath() + *config.path)
+		file, err := os.Open(GetDataPath() + *cfg.path)
 		if err != nil {
 			return err
 		}
 		decoder := json.NewDecoder(file)
-		err = decoder.Decode(&config)
+		err = decoder.Decode(&device)
 		if err != nil {
 			return err
 		}
 
-		log.Infof("Host:   %s", config.Host)
-		log.Infof("DeviceID: %s", config.DeviceID)
-		log.Infof("ApiKey: %s", config.ApiKey)
-		log.Infof("Quiet:  %t", config.Quiet)
+		log.Infof("Server:   %s", device.Server)
+		log.Infof("DeviceID: %s", device.Id)
+		log.Infof("ApiKey:   %s", device.ApiKey)
+		log.Infof("Quiet:    %t", device.Quiet)
 
-		config.loaded = true
+		cfg.loaded = true
 	}
 	return nil
 }

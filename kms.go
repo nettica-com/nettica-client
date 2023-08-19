@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"os"
 	"sync"
 
@@ -75,7 +75,7 @@ func KeyLoad() error {
 		return err
 	}
 
-	bytes, err := ioutil.ReadAll(file)
+	bytes, err := io.ReadAll(file)
 	file.Close()
 
 	if err != nil {

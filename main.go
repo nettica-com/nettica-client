@@ -23,7 +23,29 @@ func main() {
 
 	err = loadConfig()
 	if err != nil && len(os.Args) < 2 {
-		log.Error("Could not load config,  will load when it is ready. err= ", err)
+		log.Error("Could not load config, will load when it is ready. err= ", err)
+	}
+
+	d, err := GetNetticaDevice()
+	if err != nil {
+		log.Errorf("Could not get device: %v", err)
+	}
+	if !CompareDevices(d, &device) {
+		log.Infof("Device changed, saving config")
+		device = *d
+		err = saveConfig()
+		if err != nil {
+			log.Errorf("Could not save config: %v", err)
+		}
+		err = reloadConfig()
+		if err != nil {
+			log.Errorf("Could not reload config: %v", err)
+		}
+	}
+
+	if !device.Enable {
+		log.Info("Device is disabled, exiting")
+		return
 	}
 
 	KeyInitialize()

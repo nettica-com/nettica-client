@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net"
 	"os"
@@ -36,7 +36,7 @@ func StartDNS() error {
 		if err != nil {
 			time.Sleep(time.Second)
 		} else {
-			conf, err = ioutil.ReadAll(file)
+			conf, err = io.ReadAll(file)
 			file.Close()
 			if err != nil {
 				log.Errorf("Error reading nettica config file: %v", err)
@@ -63,7 +63,7 @@ func StartDNS() error {
 	for i := 0; i < len(msg.Config); i++ {
 		index := -1
 		for j := 0; j < len(msg.Config[i].VPNs); j++ {
-			if msg.Config[i].VPNs[j].DeviceID == config.DeviceID {
+			if msg.Config[i].VPNs[j].DeviceID == device.Id {
 				index = j
 				break
 			}
@@ -135,7 +135,7 @@ func UpdateDNS(msg model.Message) error {
 	for i := 0; i < len(msg.Config); i++ {
 		index := -1
 		for j := 0; j < len(msg.Config[i].VPNs); j++ {
-			if msg.Config[i].VPNs[j].DeviceID == config.DeviceID {
+			if msg.Config[i].VPNs[j].DeviceID == device.Id {
 				index = j
 				break
 			}
@@ -205,7 +205,7 @@ func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 	q := strings.ToLower(r.Question[0].Name)
 	q = strings.Trim(q, ".")
 
-	if !config.Quiet {
+	if !device.Quiet {
 		log.Infof("DNS Query: %s", q)
 	}
 

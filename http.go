@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
@@ -20,7 +19,7 @@ func ReadFile(path string) (string, error) {
 	}
 	defer file.Close()
 
-	b, err := ioutil.ReadAll(file)
+	b, err := io.ReadAll(file)
 	if err != nil {
 		return "", err
 	}
@@ -63,13 +62,13 @@ func MakeStats(name string, body string) (string, error) {
 
 // statHandler will return the stats for the requested net
 func statsHandler(w http.ResponseWriter, req *http.Request) {
-	if !config.Quiet {
+	if !device.Quiet {
 		log.Infof("statsHandler")
 	}
 	// /stats/
 	parts := strings.Split(req.URL.Path, "/")
 	net := parts[2]
-	if !config.Quiet {
+	if !device.Quiet {
 		log.Infof("GetStats(%s)", net)
 	}
 
@@ -84,7 +83,7 @@ func statsHandler(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Error(err)
 	}
-	if !config.Quiet {
+	if !device.Quiet {
 		log.Infof("Stats: %s", stats)
 	}
 	w.Header().Add("Access-Control-Allow-Origin", "*")
@@ -160,21 +159,62 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case "GET":
 		log.Infof("Method: %s", req.Method)
-		Host := req.URL.Query().Get("Host")
-		DeviceID := req.URL.Query().Get("DeviceID")
-		ApiKey := req.URL.Query().Get("ApiKey")
-		CheckInterval, _ := strconv.ParseInt(req.URL.Query().Get("CheckInterval"), 10, 0)
-		if Host != "" && DeviceID != "" && ApiKey != "" && CheckInterval != 0 {
-			config.Host = Host
-			config.DeviceID = DeviceID
-			config.ApiKey = ApiKey
-			config.CheckInterval = CheckInterval
+		Server := req.URL.Query().Get("server")
+		DeviceID := req.URL.Query().Get("id")
+		ApiKey := req.URL.Query().Get("apiKey")
+		if Server != "" && DeviceID != "" && ApiKey != "" {
+			device.Server = Server
+			device.Id = DeviceID
+			device.ApiKey = ApiKey
+
+			CheckInterval, _ := strconv.ParseInt(req.URL.Query().Get("checkInterval"), 10, 0)
+			if CheckInterval != 0 {
+				device.CheckInterval = CheckInterval
+			}
+
+			appData := req.URL.Query().Get("appData")
+			if appData != "" {
+				device.AppData = appData
+			}
+
+			name := req.URL.Query().Get("name")
+			if name != "" {
+				device.Name = name
+			}
+
+			AuthDomain := req.URL.Query().Get("authDomain")
+			if AuthDomain != "" {
+				device.AuthDomain = AuthDomain
+			}
+
+			clientID := req.URL.Query().Get("clientid")
+			if clientID != "" {
+				device.ClientID = clientID
+			}
+
+			apiID := req.URL.Query().Get("apiid")
+			if apiID != "" {
+				device.ApiID = apiID
+			}
+
+			os := req.URL.Query().Get("os")
+			if os != "" {
+				device.OS = os
+			}
+
+			arch := req.URL.Query().Get("arch")
+			if arch != "" {
+				device.Architecture = arch
+			}
+
 			saveConfig()
+			UpdateNetticaDevice(device)
+
 		} else {
 			log.Error("Invalid config parameters")
 		}
 	}
-	data, err := json.Marshal(config)
+	data, err := json.Marshal(device)
 	if err != nil {
 		return
 	}

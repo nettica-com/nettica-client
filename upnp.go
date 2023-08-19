@@ -38,7 +38,7 @@ func ConfigureUPnP(vpn model.VPN) error {
 		clients, _, err := internetgateway1.NewWANIPConnection1Clients()
 
 		if err != nil {
-			log.Error("WAN Error discovering gateway, upnp likely not supported. %v", err)
+			log.Errorf("WAN Error discovering gateway, upnp likely not supported. %v", err)
 		}
 		if len(clients) == 0 {
 			log.Error("***UPNP***WAN No gateway found, upnp likely not supported.")
@@ -57,7 +57,7 @@ func ConfigureUPnP(vpn model.VPN) error {
 					// get the external ip address
 					externalIP, err := c.GetExternalIPAddress()
 					if err != nil {
-						log.Error("Error getting external ip address, %v", err)
+						log.Errorf("Error getting external ip address, %v", err)
 					} else {
 						log.Infof("***UPNP*** External IP address: %s", externalIP)
 						// compare the externalIP to the endpoint
@@ -73,14 +73,14 @@ func ConfigureUPnP(vpn model.VPN) error {
 					// delete any old port mappings
 					err = c.DeletePortMapping("", uint16(vpn.Current.ListenPort), "UDP")
 					if err != nil {
-						log.Error("Error deleting port mapping, %v", err)
+						log.Errorf("Error deleting port mapping, %v", err)
 					}
 
 					log.Infof("***UPNP*** AddPortMapping: %d %s %d %s %s", vpn.Current.ListenPort, "UDP", vpn.Current.ListenPort, localAddr.IP.String(), vpn.Name+"-"+vpn.NetName)
 					// add port mapping
 					err = c.AddPortMapping("", uint16(vpn.Current.ListenPort), "UDP", uint16(vpn.Current.ListenPort), localAddr.IP.String(), true, vpn.Name+"-"+vpn.NetName, 0)
 					if err != nil {
-						log.Error("Error adding port mapping, %v", err)
+						log.Errorf("Error adding port mapping, %v", err)
 					}
 				}
 			}
@@ -88,7 +88,7 @@ func ConfigureUPnP(vpn model.VPN) error {
 
 		ppp, _, err := internetgateway1.NewWANPPPConnection1Clients()
 		if err != nil { // no ppp connection
-			log.Error("Error discovering PPP gateway, likely doesn not exist. %v", err)
+			log.Errorf("Error discovering PPP gateway, likely doesn not exist. %v", err)
 			return err
 		}
 		if len(ppp) == 0 {
@@ -112,7 +112,7 @@ func ConfigureUPnP(vpn model.VPN) error {
 					// get the external ip address
 					externalIP, err := c.GetExternalIPAddress()
 					if err != nil {
-						log.Error("PPP Error getting external ip address, %v", err)
+						log.Errorf("PPP Error getting external ip address, %v", err)
 					} else {
 						log.Infof("***UPNP***PPP External IP address: %s", externalIP)
 						// compare the externalIP to the endpoint
@@ -128,14 +128,14 @@ func ConfigureUPnP(vpn model.VPN) error {
 					// delete any old port mappings
 					err = c.DeletePortMapping("", uint16(vpn.Current.ListenPort), "UDP")
 					if err != nil {
-						log.Error("PPP Error deleting port mapping, %v", err)
+						log.Errorf("PPP Error deleting port mapping, %v", err)
 					}
 
 					log.Infof("***UPNP***PPP AddPortMapping: %d %s %d %s %s", vpn.Current.ListenPort, "UDP", vpn.Current.ListenPort, localAddr.IP.String(), vpn.Name+"-"+vpn.NetName)
 					// add port mapping
 					err = c.AddPortMapping("", uint16(vpn.Current.ListenPort), "UDP", uint16(vpn.Current.ListenPort), localAddr.IP.String(), true, vpn.Name+"-"+vpn.NetName, 0)
 					if err != nil {
-						log.Error("PPP Error adding port mapping, %v", err)
+						log.Errorf("PPP Error adding port mapping, %v", err)
 					}
 				}
 			}

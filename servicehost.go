@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -21,13 +20,15 @@ var netticaServiceHostUpdateAPIFmt = "%s/api/v1.0/service/%s"
 
 // StartHTTPClient starts the client polling
 func StartServiceHost(c chan []byte) {
-	host := config.Host
+	host := device.Server
 	var client *http.Client
 	var etag string
 
 	err := StartContainers()
 	if err != nil {
-		log.Errorf("Error starting containers %v", err)
+		if !device.Quiet {
+			log.Errorf("Error starting containers %v", err)
+		}
 	}
 
 	if strings.HasPrefix(host, "http:") {
@@ -41,7 +42,7 @@ func StartServiceHost(c chan []byte) {
 			Dial: (&net.Dialer{
 				Timeout:   5 * time.Second,
 				KeepAlive: 60 * time.Second,
-				LocalAddr: config.sourceAddr,
+				LocalAddr: cfg.sourceAddr,
 			}).Dial,
 			TLSHandshakeTimeout: 10 * time.Second,
 		}
@@ -53,7 +54,7 @@ func StartServiceHost(c chan []byte) {
 
 	for {
 		content := <-c
-		if !config.loaded {
+		if !cfg.loaded {
 			err := loadConfig()
 			if err != nil {
 				log.Errorf("Failed to load config.")
@@ -61,9 +62,9 @@ func StartServiceHost(c chan []byte) {
 		}
 
 		// Only make API call if ServiceGroup is set
-		if config.ServiceGroup != "" && config.ServiceApiKey != "" {
-			var reqURL string = fmt.Sprintf(netticaServiceHostAPIFmt, host, config.ServiceGroup)
-			if !config.Quiet {
+		if device.ServiceGroup != "" && device.ServiceApiKey != "" {
+			var reqURL string = fmt.Sprintf(netticaServiceHostAPIFmt, host, device.ServiceGroup)
+			if !device.Quiet {
 				log.Infof("  GET %s", reqURL)
 			}
 
@@ -72,7 +73,7 @@ func StartServiceHost(c chan []byte) {
 				return
 			}
 			if req != nil {
-				req.Header.Set("X-API-KEY", config.ServiceApiKey)
+				req.Header.Set("X-API-KEY", device.ServiceApiKey)
 				req.Header.Set("User-Agent", "nettica-client/2.0")
 				req.Header.Set("Content-Type", "application/json")
 				req.Header.Set("If-None-Match", etag)
@@ -112,7 +113,9 @@ func StartContainers() error {
 	file, err := os.Open(GetDataPath() + "nettica-service-host.json")
 
 	if err != nil {
-		log.Errorf("Error opening config file %v", err)
+		if !device.Quiet {
+			log.Errorf("Error opening config file %v", err)
+		}
 		return err
 	}
 	body, err := io.ReadAll(file)
@@ -160,7 +163,7 @@ func StartContainers() error {
 func UpdateNetticaServiceHost(service model.Service) error {
 
 	log.Infof("UPDATING SERVICE: %v", service)
-	server := config.Host
+	server := device.Server
 	var client *http.Client
 
 	if strings.HasPrefix(server, "http:") {
@@ -174,7 +177,7 @@ func UpdateNetticaServiceHost(service model.Service) error {
 			Dial: (&net.Dialer{
 				Timeout:   5 * time.Second,
 				KeepAlive: 60 * time.Second,
-				LocalAddr: config.sourceAddr,
+				LocalAddr: cfg.sourceAddr,
 			}).Dial,
 			TLSHandshakeTimeout: 10 * time.Second,
 		}
@@ -196,7 +199,7 @@ func UpdateNetticaServiceHost(service model.Service) error {
 		return err
 	}
 	if req != nil {
-		req.Header.Set("X-API-KEY", config.ServiceApiKey)
+		req.Header.Set("X-API-KEY", device.ServiceApiKey)
 		req.Header.Set("User-Agent", "nettica-client/2.0")
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -206,7 +209,7 @@ func UpdateNetticaServiceHost(service model.Service) error {
 		if resp.StatusCode != 200 {
 			log.Errorf("PATCH Error: Response %v", resp.StatusCode)
 		} else {
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				log.Errorf("error reading body %v", err)
 			}
@@ -238,10 +241,10 @@ func UpdateServiceHostConfig(body []byte) {
 	file, err := os.Open(GetDataPath() + "nettica-service-host.json")
 
 	if err != nil {
-		log.Errorf("Error opening config file %v", err)
+		log.Errorf("Error opening service host config file %v", err)
 		return
 	}
-	conf, err := ioutil.ReadAll(file)
+	conf, err := io.ReadAll(file)
 	file.Close()
 	if err != nil {
 		log.Errorf("Error reading nettica config file: %v", err)
@@ -406,7 +409,7 @@ func DoServiceWork() {
 				c <- b
 
 				curTs = calculateCurrentTimestamp()
-				curTs += config.CheckInterval
+				curTs += device.CheckInterval
 			}
 
 		}

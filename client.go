@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -18,13 +17,14 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-var netticaHostAPIFmt = "%s/api/v1.0/device/%s/status"
-var netticaHostUpdateAPIFmt = "%s/api/v1.0/device/%s"
+var netticaDeviceStatusAPIFmt = "%s/api/v1.0/device/%s/status"
+var netticaDeviceAPIFmt = "%s/api/v1.0/device/%s"
+var netticaVPNUpdateAPIFmt = "%s/api/v1.0/vpn/%s"
 
 // Start the channel that iterates the nettica update function
 func StartChannel(c chan []byte) {
 
-	log.Infof("StartChannel Nettica Host %s", config.Host)
+	log.Infof("StartChannel Nettica Host %s", device.Server)
 	etag := ""
 	var err error
 
@@ -34,19 +34,19 @@ func StartChannel(c chan []byte) {
 			break
 		}
 
-		etag, err = GetNetticaConfig(etag)
+		etag, err = GetNetticaVPN(etag)
 		if err != nil {
-			log.Errorf("Error getting nettica config: %v", err)
+			log.Errorf("Error getting nettica device: %v", err)
 		}
 	}
 }
 
 func CallNettica(etag *string) ([]byte, error) {
 
-	vpn := config.Host
+	server := device.Server
 	var client *http.Client
 
-	if strings.HasPrefix(vpn, "http:") {
+	if strings.HasPrefix(server, "http:") {
 		client = &http.Client{
 			Timeout: time.Second * 10,
 		}
@@ -57,7 +57,7 @@ func CallNettica(etag *string) ([]byte, error) {
 			Dial: (&net.Dialer{
 				Timeout:   5 * time.Second,
 				KeepAlive: 60 * time.Second,
-				LocalAddr: config.sourceAddr,
+				LocalAddr: cfg.sourceAddr,
 			}).Dial,
 			TLSHandshakeTimeout: 10 * time.Second,
 		}
@@ -67,8 +67,8 @@ func CallNettica(etag *string) ([]byte, error) {
 
 	}
 
-	var reqURL string = fmt.Sprintf(netticaHostAPIFmt, vpn, config.DeviceID)
-	if !config.Quiet {
+	var reqURL string = fmt.Sprintf(netticaDeviceStatusAPIFmt, server, device.Id)
+	if !device.Quiet {
 		log.Infof("  GET %s", reqURL)
 	}
 
@@ -77,7 +77,7 @@ func CallNettica(etag *string) ([]byte, error) {
 		return nil, err
 	}
 	if req != nil {
-		req.Header.Set("X-API-KEY", config.ApiKey)
+		req.Header.Set("X-API-KEY", device.ApiKey)
 		req.Header.Set("User-Agent", "nettica-client/2.0")
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("If-None-Match", *etag)
@@ -85,7 +85,7 @@ func CallNettica(etag *string) ([]byte, error) {
 	resp, err := client.Do(req)
 	if err == nil {
 		if resp.StatusCode == 304 {
-			buffer, err := ioutil.ReadFile(GetDataPath() + "nettica.json")
+			buffer, err := os.ReadFile(GetDataPath() + "nettica.json")
 			if err == nil {
 				return buffer, nil
 			}
@@ -94,9 +94,9 @@ func CallNettica(etag *string) ([]byte, error) {
 			return nil, fmt.Errorf("Unauthorized")
 		} else if resp.StatusCode != 200 {
 			log.Errorf("Response Error Code: %v", resp.StatusCode)
-			return nil, fmt.Errorf("Response Error Code: %v", resp.StatusCode)
+			return nil, fmt.Errorf("response error code: %v", resp.StatusCode)
 		} else {
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				log.Errorf("error reading body %v", err)
 			}
@@ -110,9 +110,7 @@ func CallNettica(etag *string) ([]byte, error) {
 			} else {
 				log.Infof("etag %s is equal", etag2)
 			}
-			if resp != nil {
-				resp.Body.Close()
-			}
+			resp.Body.Close()
 
 			return body, nil
 		}
@@ -124,9 +122,237 @@ func CallNettica(etag *string) ([]byte, error) {
 
 }
 
-func GetNetticaConfig(etag string) (string, error) {
+func GetNetticaDevice() (*model.Device, error) {
 
-	if !config.loaded {
+	if !cfg.loaded {
+		err := loadConfig()
+		if err != nil {
+			log.Errorf("Failed to load config.")
+		}
+	}
+
+	server := device.Server
+	var client *http.Client
+
+	if strings.HasPrefix(server, "http:") {
+		client = &http.Client{
+			Timeout: time.Second * 10,
+		}
+	} else {
+		// Create a transport like http.DefaultTransport, but with the configured LocalAddr
+		transport := &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			Dial: (&net.Dialer{
+				Timeout:   5 * time.Second,
+				KeepAlive: 60 * time.Second,
+				LocalAddr: cfg.sourceAddr,
+			}).Dial,
+			TLSHandshakeTimeout: 10 * time.Second,
+		}
+		client = &http.Client{
+			Transport: transport,
+		}
+
+	}
+
+	var reqURL string = fmt.Sprintf(netticaDeviceAPIFmt, server, device.Id)
+	if !device.Quiet {
+		log.Infof("  GET %s", reqURL)
+	}
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	if req != nil {
+		req.Header.Set("X-API-KEY", device.ApiKey)
+		req.Header.Set("User-Agent", "nettica-client/2.0")
+		req.Header.Set("Content-Type", "application/json")
+	}
+	resp, err := client.Do(req)
+	if err == nil {
+		if resp.StatusCode == 401 {
+			return nil, fmt.Errorf("Unauthorized")
+		} else if resp.StatusCode != 200 {
+			log.Errorf("Response Error Code: %v", resp.StatusCode)
+			return nil, fmt.Errorf("response error code: %v", resp.StatusCode)
+		} else {
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				log.Errorf("error reading body %v", err)
+			}
+			log.Debugf("%s", string(body))
+			resp.Body.Close()
+
+			// Marshall the JSON into a Device struct
+			var d model.Device
+			err = json.Unmarshal(body, &d)
+			if err != nil {
+				log.Errorf("error unmarshalling json %v", err)
+			}
+
+			return &d, nil
+		}
+	} else {
+		log.Errorf("ERROR: %v, continuing", err)
+	}
+
+	return nil, err
+}
+
+// function compares two devices and returns true if they are the same
+func CompareDevices(d1 *model.Device, d2 *model.Device) bool {
+
+	if (d1 == nil) || (d2 == nil) {
+		return false
+	}
+
+	if d1.Id != d2.Id {
+		return false
+	}
+
+	if d1.Name != d2.Name {
+		return false
+	}
+
+	if d1.ApiKey != d2.ApiKey {
+		return false
+	}
+
+	if d1.Server != d2.Server {
+		return false
+	}
+
+	if d1.Quiet != d2.Quiet {
+		return false
+	}
+
+	if d1.Debug != d2.Debug {
+		return false
+	}
+
+	if d1.CheckInterval != d2.CheckInterval {
+		return false
+	}
+
+	if d1.Enable != d2.Enable {
+		return false
+	}
+
+	if d1.Platform != d2.Platform {
+		return false
+	}
+
+	if d1.Version != d2.Version {
+		return false
+	}
+
+	if d1.SourceAddress != d2.SourceAddress {
+		return false
+	}
+
+	if d1.Updated != d2.Updated {
+		return false
+	}
+
+	if d1.Created != d2.Created {
+		return false
+	}
+
+	if d1.ApiID != d2.ApiID {
+		return false
+	}
+
+	if d1.ClientID != d2.ClientID {
+		return false
+	}
+
+	if d1.AppData != d2.AppData {
+		return false
+	}
+
+	if d1.AuthDomain != d2.AuthDomain {
+		return false
+	}
+
+	if d1.AccountID != d2.AccountID {
+		return false
+	}
+
+	return true
+}
+
+func UpdateNetticaDevice(d model.Device) error {
+
+	log.Infof("UPDATING DEVICE: %v", d)
+
+	server := device.Server
+	var client *http.Client
+
+	if strings.HasPrefix(server, "http:") {
+		client = &http.Client{
+			Timeout: time.Second * 10,
+		}
+	} else {
+		// Create a transport like http.DefaultTransport, but with the configured LocalAddr
+		transport := &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			Dial: (&net.Dialer{
+				Timeout:   5 * time.Second,
+				KeepAlive: 60 * time.Second,
+				LocalAddr: cfg.sourceAddr,
+			}).Dial,
+			TLSHandshakeTimeout: 10 * time.Second,
+		}
+		client = &http.Client{
+			Transport: transport,
+		}
+
+	}
+
+	var reqURL string = fmt.Sprintf(netticaDeviceAPIFmt, server, d.Id)
+	log.Infof("  PATCH %s", reqURL)
+	content, err := json.Marshal(d)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("PATCH", reqURL, bytes.NewBuffer(content))
+	if err != nil {
+		return err
+	}
+	if req != nil {
+		req.Header.Set("X-API-KEY", device.ApiKey)
+		req.Header.Set("User-Agent", "nettica-client/2.0")
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := client.Do(req)
+	if err == nil {
+		if resp.StatusCode != 200 {
+			log.Errorf("PATCH Error: Response %v", resp.StatusCode)
+		} else {
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				log.Errorf("error reading body %v", err)
+			}
+			log.Infof("%s", string(body))
+		}
+	}
+
+	if resp != nil {
+		resp.Body.Close()
+	}
+	if req != nil {
+		req.Body.Close()
+	}
+
+	return nil
+}
+
+func GetNetticaVPN(etag string) (string, error) {
+
+	if !cfg.loaded {
 		err := loadConfig()
 		if err != nil {
 			log.Errorf("Failed to load config.")
@@ -140,7 +366,6 @@ func GetNetticaConfig(etag string) (string, error) {
 			// Read the config and find another API key
 			// pick up any changes from the agent or manually editing the config file.
 			reloadConfig()
-
 		} else {
 			log.Error(err)
 		}
@@ -155,7 +380,7 @@ func GetNetticaConfig(etag string) (string, error) {
 func UpdateVPN(vpn model.VPN) error {
 
 	log.Infof("UPDATING VPN: %v", vpn)
-	server := config.Host
+	server := device.Server
 	var client *http.Client
 
 	if strings.HasPrefix(server, "http:") {
@@ -169,7 +394,7 @@ func UpdateVPN(vpn model.VPN) error {
 			Dial: (&net.Dialer{
 				Timeout:   5 * time.Second,
 				KeepAlive: 60 * time.Second,
-				LocalAddr: config.sourceAddr,
+				LocalAddr: cfg.sourceAddr,
 			}).Dial,
 			TLSHandshakeTimeout: 10 * time.Second,
 		}
@@ -179,7 +404,7 @@ func UpdateVPN(vpn model.VPN) error {
 
 	}
 
-	var reqURL string = fmt.Sprintf(netticaHostUpdateAPIFmt, server, vpn.Id)
+	var reqURL string = fmt.Sprintf(netticaVPNUpdateAPIFmt, server, vpn.Id)
 	log.Infof("  PATCH %s", reqURL)
 	content, err := json.Marshal(vpn)
 	if err != nil {
@@ -191,7 +416,7 @@ func UpdateVPN(vpn model.VPN) error {
 		return err
 	}
 	if req != nil {
-		req.Header.Set("X-API-KEY", config.ApiKey)
+		req.Header.Set("X-API-KEY", device.ApiKey)
 		req.Header.Set("User-Agent", "nettica-client/2.0")
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -236,7 +461,7 @@ func UpdateNetticaConfig(body []byte) {
 		log.Errorf("Error opening nettica.json file %v", err)
 		return
 	}
-	conf, err := ioutil.ReadAll(file)
+	conf, err := io.ReadAll(file)
 	file.Close()
 	if err != nil {
 		log.Errorf("Error reading nettica config file: %v", err)
@@ -288,7 +513,7 @@ func UpdateNetticaConfig(body []byte) {
 		// Get our local subnets, called here to avoid duplication
 		subnets, err := GetLocalSubnets()
 		if err != nil {
-			log.Errorf("GetLocalSubnets, err = ", err)
+			log.Errorf("GetLocalSubnets, err = %v", err)
 		}
 
 		// first, delete any netes that are no longer in the conf
@@ -306,7 +531,7 @@ func UpdateNetticaConfig(body []byte) {
 				os.Remove(GetDataPath() + oldconf.Config[i].NetName + ".conf")
 
 				for _, vpn := range oldconf.Config[i].VPNs {
-					if vpn.DeviceID == config.DeviceID {
+					if vpn.DeviceID == device.Id {
 						KeyDelete(vpn.Current.PublicKey)
 						KeySave()
 					}
@@ -318,7 +543,7 @@ func UpdateNetticaConfig(body []byte) {
 		for i := 0; i < len(msg.Config); i++ {
 			index := -1
 			for j := 0; j < len(msg.Config[i].VPNs); j++ {
-				if msg.Config[i].VPNs[j].DeviceID == config.DeviceID {
+				if msg.Config[i].VPNs[j].DeviceID == device.Id {
 					index = j
 					break
 				}
@@ -397,7 +622,7 @@ func UpdateNetticaConfig(body []byte) {
 					log.Errorf("Error opening %s for read: %v", msg.Config[i].NetName, err)
 					force = true
 				} else {
-					bits, err = ioutil.ReadAll(file)
+					bits, err = io.ReadAll(file)
 					file.Close()
 					if err != nil {
 						log.Errorf("Error reading nettica config file: %v", err)
@@ -475,7 +700,7 @@ func StartBackgroundRefreshService() {
 			log.Errorf("Error opening nettica.json for read: %v", err)
 			return
 		}
-		bytes, err := ioutil.ReadAll(file)
+		bytes, err := io.ReadAll(file)
 		file.Close()
 		if err != nil {
 			log.Errorf("Error reading nettica config file: %v", err)
@@ -492,13 +717,13 @@ func StartBackgroundRefreshService() {
 		// Get our local subnets, called here to avoid duplication
 		subnets, err := GetLocalSubnets()
 		if err != nil {
-			log.Errorf("GetLocalSubnets, err = ", err)
+			log.Errorf("GetLocalSubnets, err = %v", err)
 		}
 
 		for i := 0; i < len(msg.Config); i++ {
 			index := -1
 			for j := 0; j < len(msg.Config[i].VPNs); j++ {
-				if msg.Config[i].VPNs[j].DeviceID == config.DeviceID {
+				if msg.Config[i].VPNs[j].DeviceID == device.Id {
 					index = j
 					break
 				}
@@ -630,7 +855,7 @@ func DoWork() {
 				c <- b
 
 				curTs = calculateCurrentTimestamp()
-				curTs += config.CheckInterval
+				curTs += device.CheckInterval
 			}
 
 		}
