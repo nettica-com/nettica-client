@@ -75,6 +75,7 @@ func loadConfig() error {
 		device.SourceAddress = "0.0.0.0"
 		device.OS = runtime.GOOS
 		device.Architecture = runtime.GOARCH
+		device.Enable = true
 
 		// load defaults from environment
 		device.Server = os.Getenv("NETTICA_SERVER")

@@ -172,9 +172,14 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 				device.CheckInterval = CheckInterval
 			}
 
-			appData := req.URL.Query().Get("appData")
+			appData := req.URL.Query().Get("appdata")
 			if appData != "" {
 				device.AppData = appData
+			}
+
+			accountid := req.URL.Query().Get("accountid")
+			if accountid != "" {
+				device.AccountID = accountid
 			}
 
 			name := req.URL.Query().Get("name")

@@ -54,7 +54,7 @@ AllowedIPs = {{ StringsJoin .Current.AllowedIPs ", " }}
 {{ if .Current.PersistentKeepalive -}}PersistentKeepalive = {{ .Current.PersistentKeepalive }}{{ end }}
 {{ else -}}
 {{ if .Current.Endpoint -}}
-# {{.Name}} / {{.Email}} / Updated: {{.Updated}} / Created: {{.Created}}
+# {{.Name}} / Updated: {{.Updated}} / Created: {{.Created}}
 [Peer]
 PublicKey = {{ .Current.PublicKey }}
 PresharedKey = {{ .Current.PresharedKey }}
