@@ -46,6 +46,11 @@ func CallNettica(etag *string) ([]byte, error) {
 	server := device.Server
 	var client *http.Client
 
+	// don't do anything if the device is not configured
+	if device.Server == "" || device.ApiKey == "" || device.Id == "" {
+		return nil, fmt.Errorf("invalid device configuration")
+	}
+
 	if strings.HasPrefix(server, "http:") {
 		client = &http.Client{
 			Timeout: time.Second * 10,
@@ -92,6 +97,8 @@ func CallNettica(etag *string) ([]byte, error) {
 
 		} else if resp.StatusCode == 401 {
 			return nil, fmt.Errorf("Unauthorized")
+		} else if resp.StatusCode == 404 {
+			return nil, fmt.Errorf("not found")
 		} else if resp.StatusCode != 200 {
 			log.Errorf("Response Error Code: %v", resp.StatusCode)
 			return nil, fmt.Errorf("response error code: %v", resp.StatusCode)
@@ -366,6 +373,13 @@ func GetNetticaVPN(etag string) (string, error) {
 			// Read the config and find another API key
 			// pick up any changes from the agent or manually editing the config file.
 			reloadConfig()
+		} else if err.Error() == "not found" {
+			log.Errorf("Device not found")
+			device.Id = ""
+			device.ApiKey = ""
+			os.Remove(GetDataPath() + "nettica.json")
+			os.Remove(GetDataPath() + "nettica.conf")
+			os.Remove(GetDataPath() + "keys.json")
 		} else {
 			log.Error(err)
 		}
