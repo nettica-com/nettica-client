@@ -84,8 +84,9 @@ func loadConfig() error {
 		device.ServiceApiKey = os.Getenv("NETTICA_SERVICE_API_KEY")
 
 		if device.Server == "" {
-			device.Server = "https://my.nettica.com"
+			device.Server = "https://dev.nettica.com"
 		}
+		device.Enable = true
 
 		// pick up command line arguments
 		cfg.path = flag.String("C", "nettica.conf", "Path to configuration file")

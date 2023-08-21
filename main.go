@@ -29,17 +29,18 @@ func main() {
 	d, err := GetNetticaDevice()
 	if err != nil {
 		log.Errorf("Could not get device: %v", err)
-	}
-	if !CompareDevices(d, &device) {
-		log.Infof("Device changed, saving config")
-		device = *d
-		err = saveConfig()
-		if err != nil {
-			log.Errorf("Could not save config: %v", err)
-		}
-		err = reloadConfig()
-		if err != nil {
-			log.Errorf("Could not reload config: %v", err)
+	} else {
+		if !CompareDevices(d, &device) {
+			log.Infof("Device changed, saving config")
+			device = *d
+			err = saveConfig()
+			if err != nil {
+				log.Errorf("Could not save config: %v", err)
+			}
+			err = reloadConfig()
+			if err != nil {
+				log.Errorf("Could not reload config: %v", err)
+			}
 		}
 	}
 
