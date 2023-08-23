@@ -1,4 +1,6 @@
 nettica-client.exe
 nettica-client
 __debug_bin
+nettica-client*
+__debug_bin*
 *.deb
