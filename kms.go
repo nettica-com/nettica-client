@@ -48,7 +48,7 @@ func KeySave() error {
 	KeyLock.Lock()
 	defer KeyLock.Unlock()
 
-	file, err := os.OpenFile(GetDataPath()+"keys.json", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+	file, err := os.OpenFile(GetDataPath()+"keys.json", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if file != nil {
 		defer file.Close()
 	}

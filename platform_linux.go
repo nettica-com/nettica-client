@@ -83,7 +83,7 @@ func StartContainer(service model.Service) (string, error) {
 
 	port := fmt.Sprintf("%d", service.ServicePort)
 
-	var args = []string{"run", "--rm", "-d", "--cap-add", "NET_ADMIN", "--cap-add", "SYS_MODULE", "--sysctl", "net.ipv4.conf.all.src_valid_mark=1", "-e", "NETTICA_HOST_ID=" + service.Relay.DeviceID, "-e", "NETTICA_API_KEY=" + service.ApiKey, "-p", port + ":" + port + "/udp", "nettica-client"}
+	var args = []string{"run", "--rm", "-d", "--cap-add", "NET_ADMIN", "--cap-add", "SYS_MODULE", "--sysctl", "net.ipv4.conf.all.src_valid_mark=1", "-e", "NETTICA_DEVICE_ID=" + service.Device.Id, "-e", "NETTICA_API_KEY=" + service.Device.ApiKey, "-p", port + ":" + port + "/udp", "nettica-client"}
 	cmd := exec.Command("docker", args...)
 
 	var outerr bytes.Buffer
