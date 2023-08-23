@@ -511,7 +511,8 @@ func UpdateNetticaConfig(body []byte) {
 		var oldconf model.Message
 		err = json.Unmarshal(conf, &oldconf)
 		if err != nil {
-			log.Errorf("Error reading message from disk")
+			log.Errorf("Error reading old config: %v", err)
+			log.Infof("Old config: %v", string(conf))
 		}
 
 		log.Debugf("%v", msg)

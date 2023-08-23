@@ -10,8 +10,8 @@ services:
     environment:
       - USERID
       - GROUPID
-      - NETTICA_HOST
-      - NETTICA_HOST_ID
+      - NETTICA_SERVER
+      - NETTICA_DEVICE_ID
       - NETTICA_API_KEY
     cap_add:
       - NET_ADMIN
@@ -20,5 +20,5 @@ services:
       - 8.8.8.8
       - 9.9.9.9
     ports:
-      - "30000:30000/udp"
+      - "35000:35000/udp"
 

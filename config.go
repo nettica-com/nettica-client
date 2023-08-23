@@ -33,6 +33,9 @@ func saveConfig() error {
 	if cfg.path == nil {
 		return nil
 	}
+	if device.CheckInterval == 0 {
+		device.CheckInterval = 10
+	}
 	data, err := json.Marshal(device)
 	if err != nil {
 		return err
@@ -54,6 +57,7 @@ func reloadConfig() error {
 	log.Infof("Server:   %s", device.Server)
 	log.Infof("DeviceID: %s", device.Id)
 	log.Infof("ApiKey:   %s", device.ApiKey)
+	log.Infof("CheckInterval:   %d", device.CheckInterval)
 	log.Infof("Quiet:    %t", device.Quiet)
 
 	return nil
