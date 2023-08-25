@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/nettica-com/nettica-admin/model"
-	util "github.com/nettica-com/nettica-admin/util"
+	"github.com/nettica-com/nettica-admin/util"
 	log "github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
