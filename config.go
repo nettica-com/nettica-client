@@ -40,7 +40,7 @@ func saveConfig() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(GetDataPath()+*cfg.path, data, 0600)
+	return os.WriteFile(GetDataPath()+*cfg.path, data, 0644)
 }
 
 func reloadConfig() error {

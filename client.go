@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/nettica-com/nettica-admin/model"
-	"github.com/nettica-com/nettica-admin/util"
 	log "github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
@@ -653,7 +652,7 @@ func UpdateNetticaConfig(body []byte) {
 						log.Errorf("Error stopping wireguard: %v", err)
 					}
 
-					err = util.WriteFile(path+msg.Config[i].NetName+".conf", text)
+					err = os.WriteFile(path+msg.Config[i].NetName+".conf", text, 0600)
 					if err != nil {
 						log.Errorf("Error writing file %s : %s", path+msg.Config[i].NetName+".conf", err)
 					}
@@ -805,7 +804,7 @@ func StartBackgroundRefreshService() {
 					log.Errorf("error on template: %s", err)
 				}
 				path := GetWireguardPath()
-				err = util.WriteFile(path+msg.Config[i].NetName+".conf", text)
+				err = os.WriteFile(path+msg.Config[i].NetName+".conf", text, 0600)
 				if err != nil {
 					log.Errorf("Error writing file %s : %s", path+msg.Config[i].NetName+".conf", err)
 				}
