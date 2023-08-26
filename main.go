@@ -30,10 +30,14 @@ func main() {
 	if err != nil {
 		log.Errorf("Could not get device: %v", err)
 	}
+	merged := false
+
 	if d != nil {
 
 		if !CompareDevices(d, &device) {
 			log.Infof("Device changed, saving config")
+			MergeDevices(d, &device)
+			merged = true
 			device = *d
 			err = saveConfig()
 			if err != nil {
@@ -49,6 +53,13 @@ func main() {
 	if !device.Enable {
 		log.Info("Device is disabled, exiting")
 		return
+	}
+
+	if merged {
+		err = UpdateNetticaDevice(device)
+		if err != nil {
+			log.Errorf("Could not update device: %v", err)
+		}
 	}
 
 	KeyInitialize()

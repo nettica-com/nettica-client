@@ -285,7 +285,91 @@ func CompareDevices(d1 *model.Device, d2 *model.Device) bool {
 		return false
 	}
 
+	if d1.ServiceGroup != d2.ServiceGroup {
+		return false
+	}
+
+	if d1.ServiceApiKey != d2.ServiceApiKey {
+		return false
+	}
+
 	return true
+}
+
+// function merges two devices, d1 is the source, d2 is the destination
+func MergeDevices(d1 *model.Device, d2 *model.Device) {
+
+	if (d1 == nil) || (d2 == nil) {
+		return
+	}
+
+	if d1.Id != d2.Id {
+		d2.Id = d1.Id
+	}
+
+	if d1.Name != "" {
+		d2.Name = d1.Name
+	}
+
+	if d1.ApiKey != "" {
+		d2.ApiKey = d1.ApiKey
+	}
+
+	if d1.Server != "" {
+		d2.Server = d1.Server
+	}
+
+	d2.Quiet = d1.Quiet
+	d2.Debug = d1.Debug
+	if d1.CheckInterval != 0 {
+		d2.CheckInterval = d1.CheckInterval
+	}
+
+	d2.Enable = d1.Enable
+
+	if d1.Platform != "" {
+		d2.Platform = d1.Platform
+	}
+
+	if d1.Version != "" {
+		d2.Version = d1.Version
+	}
+
+	if d1.SourceAddress != "" {
+		d2.SourceAddress = d1.SourceAddress
+	}
+
+	d2.Updated = d1.Updated
+	d2.Created = d1.Created
+
+	if d1.ApiID != "" {
+		d2.ApiID = d1.ApiID
+	}
+
+	if d1.ClientID != "" {
+		d2.ClientID = d1.ClientID
+	}
+
+	if d1.AppData != "" {
+		d2.AppData = d1.AppData
+	}
+
+	if d1.AuthDomain != "" {
+		d2.AuthDomain = d1.AuthDomain
+	}
+
+	if d1.AccountID != "" {
+		d2.AccountID = d1.AccountID
+	}
+
+	if d1.ServiceGroup != "" {
+		d2.ServiceGroup = d1.ServiceGroup
+	}
+
+	if d1.ServiceApiKey != "" {
+		d2.ServiceApiKey = d1.ServiceApiKey
+	}
+
 }
 
 func UpdateNetticaDevice(d model.Device) error {
