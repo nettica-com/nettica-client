@@ -38,7 +38,6 @@ func main() {
 			log.Infof("Device changed, saving config")
 			MergeDevices(d, &device)
 			merged = true
-			device = *d
 			err = saveConfig()
 			if err != nil {
 				log.Errorf("Could not save config: %v", err)
