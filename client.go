@@ -600,6 +600,17 @@ func UpdateNetticaConfig(body []byte) {
 
 		log.Debugf("%v", msg)
 
+		// See if the device is enabled.  If its not, stop all networks and return
+		if (msg.Device != nil) && !msg.Device.Enable {
+			log.Infof("Device is disabled, stopping all networks")
+			for i := 0; i < len(msg.Config); i++ {
+				StopWireguard(msg.Config[i].NetName)
+			}
+			MergeDevices(msg.Device, &device)
+			saveConfig()
+			return
+		}
+
 		// make a copy of the message since UpdateDNS will alter it.
 		var msg2 model.Message
 		json.Unmarshal(body, &msg2)
@@ -614,7 +625,7 @@ func UpdateNetticaConfig(body []byte) {
 			log.Errorf("GetLocalSubnets, err = %v", err)
 		}
 
-		// first, delete any netes that are no longer in the conf
+		// first, delete any nets that are no longer in the conf
 		for i := 0; i < len(oldconf.Config); i++ {
 			found := false
 			for j := 0; j < len(msg.Config); j++ {
