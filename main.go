@@ -11,10 +11,16 @@ import (
 
 func main() {
 
-	path := "nettica.log"
-	file, err := os.Open(GetDataPath() + path)
+	// Ensure the data directory exists
+	err := os.MkdirAll(GetDataPath(), 0700)
 	if err != nil {
+		log.Errorf("Could not create data directory: %v", err)
+	}
 
+	path := "nettica.log"
+	file, err := os.OpenFile(GetDataPath()+path, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Info("Create a file named nettica.log in the nettica directory if you want to capture logs to a file")
 	} else {
 		log.SetFormatter(&log.TextFormatter{})
 		log.SetOutput(file)

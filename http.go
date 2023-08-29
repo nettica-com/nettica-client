@@ -149,6 +149,35 @@ func stopServiceHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func vpnHandler(w http.ResponseWriter, req *http.Request) {
+	// add the headers here to pass preflight checks
+	w.Header().Add("Access-Control-Allow-Origin", "*")
+	w.Header().Add("Access-Control-Allow-Methods", "*")
+
+	// extract the net name from the url
+	parts := strings.Split(req.URL.Path, "/")
+	if len(parts) < 3 {
+		log.Errorf("Invalid url: %s", req.URL.Path)
+		io.WriteString(w, "")
+		return
+	}
+	vpnid := parts[2]
+
+	switch req.Method {
+	case "DELETE":
+		log.Infof("Method: %s %s", req.Method, req.URL.Path)
+		err := DeleteVPN(vpnid)
+		if err != nil {
+			log.Error(err)
+		}
+		io.WriteString(w, "")
+
+	default:
+		io.WriteString(w, "")
+		log.Infof("Unknown method: %s", req.Method)
+	}
+}
+
 func configHandler(w http.ResponseWriter, req *http.Request) {
 	// decode the GET request parameters and save them to the config
 
@@ -187,7 +216,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 				device.Name = name
 			}
 
-			AuthDomain := req.URL.Query().Get("authDomain")
+			AuthDomain := req.URL.Query().Get("authdomain")
 			if AuthDomain != "" {
 				device.AuthDomain = AuthDomain
 			}
@@ -232,6 +261,7 @@ func startHTTPd() {
 	http.HandleFunc("/stats/", statsHandler)
 	http.HandleFunc("/keys/", keyHandler)
 	http.HandleFunc("/service/", stopServiceHandler)
+	http.HandleFunc("/vpn/", vpnHandler)
 	http.HandleFunc("/config/", configHandler)
 
 	log.Infof("Starting web server on %s", ":53280")

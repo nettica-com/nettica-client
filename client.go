@@ -206,6 +206,70 @@ func GetNetticaDevice() (*model.Device, error) {
 	return nil, err
 }
 
+func DeleteVPN(id string) error {
+
+	var client *http.Client
+
+	if strings.HasPrefix(device.Server, "http:") {
+		client = &http.Client{
+			Timeout: time.Second * 10,
+		}
+	} else {
+		// Create a transport like http.DefaultTransport, but with the configured LocalAddr
+		transport := &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			Dial: (&net.Dialer{
+				Timeout:   5 * time.Second,
+				KeepAlive: 60 * time.Second,
+				LocalAddr: cfg.sourceAddr,
+			}).Dial,
+			TLSHandshakeTimeout: 10 * time.Second,
+		}
+		client = &http.Client{
+			Transport: transport,
+		}
+
+	}
+
+	var reqURL string = fmt.Sprintf(netticaVPNUpdateAPIFmt, device.Server, id)
+	if !device.Quiet {
+		log.Infof("  DELETE %s", reqURL)
+	}
+
+	req, err := http.NewRequest("DELETE", reqURL, nil)
+	if err != nil {
+		return err
+	}
+	if req != nil {
+		req.Header.Set("X-API-KEY", device.ApiKey)
+		req.Header.Set("User-Agent", "nettica-client/2.0")
+		req.Header.Set("Content-Type", "application/json")
+	}
+	resp, err := client.Do(req)
+	if err == nil {
+		if resp.StatusCode == 401 {
+			return fmt.Errorf("Unauthorized")
+		} else if resp.StatusCode != 200 {
+			log.Errorf("Response Error Code: %v", resp.StatusCode)
+			return fmt.Errorf("response error code: %v", resp.StatusCode)
+		} else {
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				log.Errorf("error reading body %v", err)
+			}
+			log.Debugf("%s", string(body))
+			resp.Body.Close()
+
+			return nil
+		}
+	} else {
+		log.Errorf("ERROR: %v, continuing", err)
+	}
+
+	return err
+
+}
+
 // function compares two devices and returns true if they are the same
 func CompareDevices(d1 *model.Device, d2 *model.Device) bool {
 
@@ -303,6 +367,8 @@ func MergeDevices(d1 *model.Device, d2 *model.Device) {
 		return
 	}
 
+	// Some properties, like Quiet and Debug, cannot be controlled by the server
+
 	if d1.Id != d2.Id {
 		d2.Id = d1.Id
 	}
@@ -319,10 +385,11 @@ func MergeDevices(d1 *model.Device, d2 *model.Device) {
 		d2.Server = d1.Server
 	}
 
-	d2.Quiet = d1.Quiet
-	d2.Debug = d1.Debug
 	if d1.CheckInterval != 0 {
 		d2.CheckInterval = d1.CheckInterval
+	}
+	if d2.CheckInterval == 0 {
+		d2.CheckInterval = 10
 	}
 
 	d2.Enable = d1.Enable
@@ -800,6 +867,7 @@ func GetLocalSubnets() ([]*net.IPNet, error) {
 	return subnets, nil
 }
 
+// This needs to be refactored with the main logic above
 func StartBackgroundRefreshService() {
 
 	for {
@@ -822,6 +890,17 @@ func StartBackgroundRefreshService() {
 		}
 
 		log.Debugf("%v", msg)
+
+		// See if the device is enabled.  If its not, stop all networks and return
+		if (msg.Device != nil) && !msg.Device.Enable {
+			log.Infof("Device is disabled, stopping all networks")
+			for i := 0; i < len(msg.Config); i++ {
+				StopWireguard(msg.Config[i].NetName)
+			}
+			MergeDevices(msg.Device, &device)
+			saveConfig()
+			return
+		}
 
 		// Get our local subnets, called here to avoid duplication
 		subnets, err := GetLocalSubnets()
