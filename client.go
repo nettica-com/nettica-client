@@ -19,6 +19,7 @@ import (
 var netticaDeviceStatusAPIFmt = "%s/api/v1.0/device/%s/status"
 var netticaDeviceAPIFmt = "%s/api/v1.0/device/%s"
 var netticaVPNUpdateAPIFmt = "%s/api/v1.0/vpn/%s"
+var client *http.Client
 
 // Start the channel that iterates the nettica update function
 func StartChannel(c chan []byte) {
@@ -43,32 +44,33 @@ func StartChannel(c chan []byte) {
 func CallNettica(etag *string) ([]byte, error) {
 
 	server := device.Server
-	var client *http.Client
 
 	// don't do anything if the device is not configured
 	if device.Server == "" || device.ApiKey == "" || device.Id == "" {
 		return nil, fmt.Errorf("invalid device configuration")
 	}
 
-	if strings.HasPrefix(server, "http:") {
-		client = &http.Client{
-			Timeout: time.Second * 10,
-		}
-	} else {
-		// Create a transport like http.DefaultTransport, but with the configured LocalAddr
-		transport := &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			Dial: (&net.Dialer{
-				Timeout:   5 * time.Second,
-				KeepAlive: 60 * time.Second,
-				LocalAddr: cfg.sourceAddr,
-			}).Dial,
-			TLSHandshakeTimeout: 10 * time.Second,
-		}
-		client = &http.Client{
-			Transport: transport,
-		}
+	if client == nil {
+		if strings.HasPrefix(server, "http:") {
+			client = &http.Client{
+				Timeout: time.Second * 10,
+			}
+		} else {
+			// Create a transport like http.DefaultTransport, but with the configured LocalAddr
+			transport := &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+				Dial: (&net.Dialer{
+					Timeout:   5 * time.Second,
+					KeepAlive: 60 * time.Second,
+					LocalAddr: cfg.sourceAddr,
+				}).Dial,
+				TLSHandshakeTimeout: 10 * time.Second,
+			}
+			client = &http.Client{
+				Transport: transport,
+			}
 
+		}
 	}
 
 	var reqURL string = fmt.Sprintf(netticaDeviceStatusAPIFmt, server, device.Id)
