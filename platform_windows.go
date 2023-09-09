@@ -17,14 +17,6 @@ import (
 func GetWireguardPath() string {
 
 	path := GetDataPath() + "Wireguard\\"
-	/*	path, err := exePath()
-		if err != nil {
-			path = "c:\\nettica\\"
-		}
-		if path[len(path)-1] != '\\' {
-			path = path + "\\"
-		}
-	*/
 	return path
 }
 
@@ -47,8 +39,7 @@ func GetStats(net string) (string, error) {
 	return string(out), nil
 }
 
-// StartWireguard restarts the wireguard tunnel on the given platform
-func StartWireguard(netName string) error {
+func InstallWireguard(netName string) error {
 
 	time.Sleep(1 * time.Second)
 
@@ -59,7 +50,7 @@ func StartWireguard(netName string) error {
 	cmd.Stderr = &out
 	err := cmd.Run()
 	if err != nil {
-		log.Errorf("Error starting WireGuard: %v (%s)", err, out.String())
+		log.Errorf("Error installing WireGuard tunnel: %v (%s)", err, out.String())
 		return err
 	}
 
@@ -67,8 +58,7 @@ func StartWireguard(netName string) error {
 
 }
 
-// StopWireguard stops the wireguard tunnel on the given platform
-func StopWireguard(netName string) error {
+func RemoveWireguard(netName string) error {
 
 	args := []string{"/uninstalltunnelservice", netName}
 
@@ -80,6 +70,70 @@ func StopWireguard(netName string) error {
 	cmd.Stderr = &out
 	err := cmd.Start()
 	if err != nil {
+		log.Errorf("Error removing WireGuard tunnel: %v (%s)", err, out.String())
+	}
+	log.Info(out.String())
+
+	err = cmd.Wait()
+	if err != nil {
+		log.Errorf("Error removing WireGuard tunnel: %v (%s)", err, out.String())
+	}
+
+	// remove the file if it exists
+	path := GetWireguardPath() + netName + ".conf"
+	if _, err := os.Stat(path); err == nil {
+		os.Remove(path)
+	}
+
+	return err
+
+}
+
+// StartWireguard restarts the wireguard tunnel on the given platform
+func StartWireguard(netName string) error {
+
+	// Start the existing wireguard service
+	// example: net stop WireGuardTunnel$london
+
+	args := []string{"start", "WireGuardTunnel$" + netName}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "net.exe", args...)
+	var out bytes.Buffer
+	cmd.Stderr = &out
+	err := cmd.Start()
+	if err != nil {
+		log.Errorf("Error starting WireGuard: %v (%s)", err, out.String())
+	}
+	log.Info(out.String())
+
+	err = cmd.Wait()
+	if err != nil {
+		log.Errorf("Error starting WireGuard: %v (%s)", err, out.String())
+	}
+
+	return err
+
+}
+
+// StopWireguard stops the wireguard tunnel on the given platform
+func StopWireguard(netName string) error {
+
+	// Stop the existing wireguard service
+	// example: net stop WireGuardTunnel$london
+
+	args := []string{"stop", "WireGuardTunnel$" + netName}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "net.exe", args...)
+	var out bytes.Buffer
+	cmd.Stderr = &out
+	err := cmd.Start()
+	if err != nil {
 		log.Errorf("Error stopping WireGuard: %v (%s)", err, out.String())
 	}
 	log.Info(out.String())
@@ -87,12 +141,6 @@ func StopWireguard(netName string) error {
 	err = cmd.Wait()
 	if err != nil {
 		log.Errorf("Error stopping WireGuard: %v (%s)", err, out.String())
-	}
-
-	// remove the file if it exists
-	path := GetWireguardPath() + netName + ".conf"
-	if _, err := os.Stat(path); err == nil {
-		os.Remove(path)
 	}
 
 	return err

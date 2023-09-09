@@ -705,7 +705,7 @@ func UpdateNetticaConfig(body []byte) {
 			}
 			if !found {
 				log.Infof("Deleting net %v", oldconf.Config[i].NetName)
-				StopWireguard(oldconf.Config[i].NetName)
+				RemoveWireguard(oldconf.Config[i].NetName)
 				os.Remove(GetDataPath() + oldconf.Config[i].NetName + ".conf")
 
 				for _, vpn := range oldconf.Config[i].VPNs {
@@ -830,10 +830,20 @@ func UpdateNetticaConfig(body []byte) {
 						}
 
 					} else {
+						// Start the existing service
 						err = StartWireguard(msg.Config[i].NetName)
 						if err == nil {
 							log.Infof("Started %s", msg.Config[i].NetName)
 							log.Infof("%s Config: %v", msg.Config[i].NetName, msg.Config[i])
+						} else {
+							// try to install the service (on linux, just tries to start the service again)
+							err = InstallWireguard(msg.Config[i].NetName)
+							if err != nil {
+								log.Errorf("Error installing wireguard: %v", err)
+							} else {
+								log.Infof("Installed %s Config: %v", msg.Config[i].NetName, msg.Config[i])
+							}
+
 						}
 					}
 				}
@@ -993,7 +1003,13 @@ func StartBackgroundRefreshService() {
 					if err == nil {
 						log.Infof("Started %s", msg.Config[i].NetName)
 						log.Infof("%s Config: %v", msg.Config[i].NetName, msg.Config[i])
+					} else {
+						err = InstallWireguard(msg.Config[i].NetName)
+						if err != nil {
+							log.Errorf("Error installing wireguard: %v", err)
+						}
 					}
+
 				}
 
 			}

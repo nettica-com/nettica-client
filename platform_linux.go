@@ -38,6 +38,14 @@ func GetStats(net string) (string, error) {
 	return string(out), nil
 }
 
+func InstallWireguard(netName string) error {
+	return StartWireguard(netName)
+}
+
+func RemoveWireguard(netName string) error {
+	return StopWireguard(netName)
+}
+
 func StartWireguard(netName string) error {
 
 	args := []string{"wg-quick", "up", netName}
