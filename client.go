@@ -680,6 +680,12 @@ func UpdateNetticaConfig(body []byte) {
 			return
 		}
 
+		if msg.Device.Server != device.Server {
+			log.Infof("Server has changed, new server is %s", msg.Device.Server)
+			device.Server = msg.Device.Server
+			saveConfig()
+		}
+
 		// make a copy of the message since UpdateDNS will alter it.
 		var msg2 model.Message
 		json.Unmarshal(body, &msg2)
