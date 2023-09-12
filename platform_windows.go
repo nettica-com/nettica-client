@@ -8,6 +8,9 @@ import (
 	"os/exec"
 	"time"
 
+	"golang.org/x/sys/windows/svc"
+	"golang.org/x/sys/windows/svc/mgr"
+
 	"github.com/nettica-com/nettica-admin/model"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/svc"
@@ -55,12 +58,40 @@ func InstallWireguard(netName string) error {
 	}
 
 	// open the service and set it to manual
-	args = []string{"config", "WireGuardTunnel$" + netName, "start= demand"}
-	cmd = exec.Command("sc.exe", args...)
-	cmd.Stderr = &out
-	err = cmd.Run()
+	//	args = []string{"config", "WireGuardTunnel$" + netName, "start= demand"}
+	//	cmd = exec.Command("sc.exe", args...)
+	//	cmd.Stderr = &out
+	//	err = cmd.Run()
+	//	if err != nil {
+	//		log.Errorf("Error setting WireGuard service to manual: %v (%s)", err, out.String())
+	//		return err
+	//	}
+
+	// open the service and set it to manual
+	m, err := mgr.Connect()
 	if err != nil {
-		log.Errorf("Error setting WireGuard service to manual: %v (%s)", err, out.String())
+		log.Errorf("Error connecting to service manager: %v", err)
+		return err
+	}
+	defer m.Disconnect()
+
+	service, err := m.OpenService("WireGuardTunnel$" + netName)
+	if err != nil {
+		log.Errorf("Error opening service: %v", err)
+		return err
+	}
+	defer service.Close()
+
+	config, err := service.Config()
+	if err != nil {
+		log.Errorf("Error getting service config: %v", err)
+		return err
+	}
+
+	config.StartType = mgr.StartManual
+	err = service.UpdateConfig(config)
+	if err != nil {
+		log.Errorf("Error updating service config: %v", err)
 		return err
 	}
 
