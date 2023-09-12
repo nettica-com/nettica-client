@@ -54,6 +54,16 @@ func InstallWireguard(netName string) error {
 		return err
 	}
 
+	// open the service and set it to manual
+	args = []string{"config", "WireGuardTunnel$" + netName, "start= demand"}
+	cmd = exec.Command("sc.exe", args...)
+	cmd.Stderr = &out
+	err = cmd.Run()
+	if err != nil {
+		log.Errorf("Error setting WireGuard service to manual: %v (%s)", err, out.String())
+		return err
+	}
+
 	return nil
 
 }
