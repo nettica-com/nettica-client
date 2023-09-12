@@ -13,7 +13,6 @@ import (
 
 	"github.com/nettica-com/nettica-admin/model"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/sys/windows/svc"
 )
 
 // GetWireguardPath finds wireguard location for the given platform
