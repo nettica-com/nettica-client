@@ -767,6 +767,12 @@ func UpdateNetticaConfig(body []byte) {
 					if err != nil {
 						log.Errorf("Error saving key: %s %s", vpn.Current.PublicKey, vpn.Current.PrivateKey)
 					}
+
+					// clear out the private key and update the server
+					vpn2 := vpn
+					vpn2.Current.PrivateKey = ""
+					UpdateVPN(vpn2)
+
 					key, _ = KeyLookup(vpn.Current.PublicKey)
 				}
 
@@ -848,6 +854,19 @@ func UpdateNetticaConfig(body []byte) {
 								log.Errorf("Error installing wireguard: %v", err)
 							} else {
 								log.Infof("Installed %s Config: %v", msg.Config[i].NetName, msg.Config[i])
+							}
+							// Check if the private key is not blank, if it is, we need to update the server
+							if vpn.Current.PrivateKey != "" {
+								// delete the old public key
+								KeyDelete(vpn.Current.PublicKey)
+								// Generate a new private key
+								wg, _ := wgtypes.GeneratePrivateKey()
+								privateKey := wg.String()
+								vpn.Current.PublicKey = wg.PublicKey().String()
+								vpn.Current.PrivateKey = ""
+								KeyAdd(vpn.Current.PublicKey, privateKey)
+								KeySave()
+								UpdateVPN(vpn)
 							}
 
 						}
