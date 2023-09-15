@@ -182,6 +182,15 @@ func UpdateDNS(msg model.Message) error {
 						serverTable[ip] = ip
 					}
 				}
+				if len(host.Current.Address[0]) > 3 {
+					address := host.Current.Address[0][:len(host.Current.Address[0])-3] + ":53"
+					server := &dns.Server{Addr: address, Net: "udp", TsigSecret: nil, ReusePort: true}
+					go func() {
+						if err := server.ListenAndServe(); err != nil {
+							log.Errorf("UpdateDNS: Failed to setup the DNS server on %s: %s\n", address, err.Error())
+						}
+					}()
+				}
 			}
 		}
 	}
