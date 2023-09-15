@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/nettica-com/nettica-admin/model"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -24,9 +25,19 @@ func Platform() string {
 }
 
 func GetStats(net string) (string, error) {
-	args := []string{"wg", "show", net, "transfer"}
 
-	out, err := exec.Command("/usr/local/bin/bash", args...).Output()
+	// find the utun interface from the network name
+
+	file, err := os.ReadFile("/var/run/wireguard/" + net + ".name")
+	if err != nil {
+		return "", err
+	}
+	utun := string(file)
+	utun = utun[:len(utun)-1]
+
+	args := []string{"show", utun, "transfer"}
+
+	out, err := exec.Command("./wg", args...).Output()
 	if err != nil {
 		log.Errorf("Error getting statistics: %v (%s)", err, string(out))
 		return "", err
@@ -35,29 +46,52 @@ func GetStats(net string) (string, error) {
 	return string(out), nil
 }
 
-func Startireguard(netName string) error {
+func InstallWireguard(netName string) error {
+	return StartWireguard(netName)
+}
 
-	args := []string{"wg-quick", "up", netName}
+func RemoveWireguard(netName string) error {
+	return StopWireguard(netName)
+}
 
-	cmd := exec.Command("/usr/local/bin/bash", args...)
-	cmd.Stderr = &out
+func StartWireguard(netName string) error {
+
 	go func() {
-		err := cmd.Run()
+
+		path := GetWireguardPath() + netName + ".conf"
+
+		args := []string{"-f", path}
+		cmd := exec.Command("./wireguard-go", args...)
+		var out bytes.Buffer
+		cmd.Stderr = &out
+		err := cmd.Start()
+		if err != nil {
+			log.Errorf("Error starting WireGuard: %v (%s)", err, out.String())
+			return
+		}
 	}()
 
-	if err != nil {
-		log.Errorf("Error reloading WireGuard: %v (%s)", err, out.String())
-		return err
-	}
+	go func() {
+		args := []string{"wg-quick", "up", netName}
+		cmd := exec.Command("./bash", args...)
+		var out bytes.Buffer
+		cmd.Stderr = &out
+		err := cmd.Run()
+		if err != nil {
+			log.Errorf("Error reloading WireGuard: %v (%s)", err, out.String())
+			return
+		}
 
-	return err
+	}()
+
+	return nil
 
 }
 func StopWireguard(netName string) error {
 
 	args := []string{"wg-quick", "down", netName}
 
-	cmd := exec.Command("/usr/local/bin/bash", args...)
+	cmd := exec.Command("./bash", args...)
 	var out bytes.Buffer
 	cmd.Stderr = &out
 	err := cmd.Run()

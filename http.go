@@ -62,15 +62,9 @@ func MakeStats(name string, body string) (string, error) {
 
 // statHandler will return the stats for the requested net
 func statsHandler(w http.ResponseWriter, req *http.Request) {
-	if !device.Quiet {
-		log.Infof("statsHandler")
-	}
 	// /stats/
 	parts := strings.Split(req.URL.Path, "/")
 	net := parts[2]
-	if !device.Quiet {
-		log.Infof("GetStats(%s)", net)
-	}
 
 	// GetStats will execute "wg show net transfer" and return the output
 	body, err := GetStats(net)
