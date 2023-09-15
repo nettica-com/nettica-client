@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/miekg/dns"
 	"github.com/nettica-com/nettica-admin/model"
 	log "github.com/sirupsen/logrus"
 )
@@ -145,4 +146,22 @@ func RunService(svcName string) {
 }
 
 func ServiceManager(svcName string, cmd string) {
+}
+
+func InitializeDNS() error {
+
+	go func() {
+		server := &dns.Server{Addr: "127.0.0.1:53", Net: "udp", TsigSecret: nil, ReusePort: true}
+		if err := server.ListenAndServe(); err != nil {
+			log.Errorf("UpdateDNS: Failed to setup the DNS server on %s: %s\n", "127.0.0.1:53", err.Error())
+		}
+
+	}()
+
+	return nil
+}
+
+func LaunchDNS(addr string) error {
+
+	return nil
 }

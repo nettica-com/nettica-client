@@ -196,3 +196,20 @@ func RunService(svcName string) {
 func ServiceManager(svcName string, cmd string) {
 
 }
+
+func InitializeDNS() error {
+
+	return nil
+}
+
+func LaunchDNS(address string) error {
+	server := &dns.Server{Addr: address, Net: "udp", TsigSecret: nil, ReusePort: true}
+	log.Infof("Starting DNS Server on %s", address)
+	go func() {
+		if err := server.ListenAndServe(); err != nil {
+			log.Errorf("Failed to setup the DNS server on %s: %s\n", address, err.Error())
+		}
+	}()
+
+	return nil
+}
