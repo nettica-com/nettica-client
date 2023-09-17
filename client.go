@@ -527,11 +527,6 @@ func GetNetticaVPN(etag string) (string, error) {
 			reloadConfig()
 		} else if err.Error() == "not found" {
 			log.Errorf("Device not found")
-			device.Id = ""
-			device.ApiKey = ""
-			os.Remove(GetDataPath() + "nettica.json")
-			os.Remove(GetDataPath() + "nettica.conf")
-			os.Remove(GetDataPath() + "keys.json")
 		} else {
 			log.Error(err)
 		}
