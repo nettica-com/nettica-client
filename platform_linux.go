@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/miekg/dns"
 	"github.com/nettica-com/nettica-admin/model"
 	log "github.com/sirupsen/logrus"
 )
