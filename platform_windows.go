@@ -11,6 +11,7 @@ import (
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 
+	"github.com/miekg/dns"
 	"github.com/nettica-com/nettica-admin/model"
 	log "github.com/sirupsen/logrus"
 )
