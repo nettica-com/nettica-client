@@ -823,6 +823,11 @@ func UpdateNetticaConfig(body []byte) {
 						log.Errorf("Error stopping wireguard: %v", err)
 					}
 
+					err = os.MkdirAll(path, 0700)
+					if err != nil {
+						log.Errorf("Error creating directory %s : %s", path, err)
+					}
+
 					err = os.WriteFile(path+msg.Config[i].NetName+".conf", text, 0600)
 					if err != nil {
 						log.Errorf("Error writing file %s : %s", path+msg.Config[i].NetName+".conf", err)

@@ -12,7 +12,7 @@ import (
 func main() {
 
 	// Ensure the data directory exists
-	err := os.MkdirAll(GetDataPath(), 0700)
+	err := os.MkdirAll(GetDataPath(), 0744)
 	if err != nil {
 		log.Errorf("Could not create data directory: %v", err)
 	}
