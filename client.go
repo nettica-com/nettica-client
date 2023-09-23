@@ -538,7 +538,7 @@ func GetNetticaVPN(etag string) (string, error) {
 	return "", err
 }
 
-func UpdateVPN(vpn model.VPN) error {
+func UpdateVPN(vpn *model.VPN) error {
 
 	log.Infof("UPDATING VPN: %v", vpn)
 	server := device.Server
@@ -766,7 +766,7 @@ func UpdateNetticaConfig(body []byte) {
 					// clear out the private key and update the server
 					vpn2 := vpn
 					vpn2.Current.PrivateKey = ""
-					UpdateVPN(vpn2)
+					UpdateVPN(&vpn2)
 
 					key, _ = KeyLookup(vpn.Current.PublicKey)
 				}
@@ -785,7 +785,7 @@ func UpdateNetticaConfig(body []byte) {
 					vpn2.Current.PrivateKey = ""
 
 					// Update nettica with the new public key
-					UpdateVPN(vpn2)
+					UpdateVPN(&vpn2)
 
 				} else {
 					vpn.Current.PrivateKey = key
@@ -866,7 +866,7 @@ func UpdateNetticaConfig(body []byte) {
 								vpn.Current.PrivateKey = ""
 								KeyAdd(vpn.Current.PublicKey, privateKey)
 								KeySave()
-								UpdateVPN(vpn)
+								UpdateVPN(&vpn)
 							}
 
 						}
@@ -876,6 +876,44 @@ func UpdateNetticaConfig(body []byte) {
 			}
 		}
 	}
+
+}
+
+func FindVPN(net string) (*model.VPN, error) {
+
+	file, err := os.Open(GetDataPath() + "nettica.json")
+
+	if err != nil {
+		log.Errorf("Error opening nettica.json file %v", err)
+		return nil, err
+	}
+	conf, err := io.ReadAll(file)
+	file.Close()
+	if err != nil {
+		log.Errorf("Error reading nettica config file: %v", err)
+		return nil, err
+	}
+
+	var msg model.Message
+	err = json.Unmarshal(conf, &msg)
+	if err != nil {
+		log.Errorf("Error reading message from config file")
+		return nil, err
+	}
+
+	for i := 0; i < len(msg.Config); i++ {
+		if msg.Config[i].NetName == net {
+			log.Infof("Found net %s", net)
+			for j := 0; j < len(msg.Config[i].VPNs); j++ {
+				if msg.Config[i].VPNs[j].DeviceID == device.Id {
+					log.Infof("Found VPN %v", msg.Config[i].VPNs[j])
+					return &msg.Config[i].VPNs[j], nil
+				}
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("VPN not found")
 
 }
 
@@ -1004,7 +1042,7 @@ func StartBackgroundRefreshService() {
 					vpn2.Current.PrivateKey = ""
 
 					// Update nettica with the new public key
-					UpdateVPN(vpn2)
+					UpdateVPN(&vpn2)
 
 				} else {
 					vpn.Current.PrivateKey = key

@@ -113,10 +113,11 @@ func keyHandler(w http.ResponseWriter, req *http.Request) {
 
 }
 
-func stopServiceHandler(w http.ResponseWriter, req *http.Request) {
+func ServiceHandler(w http.ResponseWriter, req *http.Request) {
 	// add the headers here to pass preflight checks
 	w.Header().Add("Access-Control-Allow-Origin", "*")
 	w.Header().Add("Access-Control-Allow-Methods", "*")
+	w.Header().Add("Access-Control-Allow-Headers", "*")
 
 	// extract the net name from the url
 	parts := strings.Split(req.URL.Path, "/")
@@ -126,16 +127,49 @@ func stopServiceHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	net := parts[2]
-	log.Infof("StopWireguard(%s)", net)
 
 	switch req.Method {
 	case "DELETE":
+		log.Infof("StopWireguard(%s)", net)
 		log.Infof("Method: %s", req.Method)
 		err := StopWireguard(net)
 		if err != nil {
 			log.Error(err)
 		}
+		vpn, err := FindVPN(net)
+		if err != nil {
+			log.Error(err)
+		}
+		if vpn != nil {
+			vpn.Enable = false
+			err = UpdateVPN(vpn)
+			if err != nil {
+				log.Error(err)
+			}
+		}
+
 		io.WriteString(w, "")
+
+	case "PATCH":
+		log.Infof("StartWireguard(%s)", net)
+		log.Infof("Method: %s", req.Method)
+
+		vpn, err := FindVPN(net)
+		if err != nil {
+			log.Error(err)
+		}
+		if vpn != nil {
+			vpn.Enable = true
+			err = UpdateVPN(vpn)
+			if err != nil {
+				log.Error(err)
+			}
+		}
+
+		err = StartWireguard(net)
+		if err != nil {
+			log.Error(err)
+		}
 
 	default:
 		io.WriteString(w, "")
@@ -254,7 +288,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 func startHTTPd() {
 	http.HandleFunc("/stats/", statsHandler)
 	http.HandleFunc("/keys/", keyHandler)
-	http.HandleFunc("/service/", stopServiceHandler)
+	http.HandleFunc("/service/", ServiceHandler)
 	http.HandleFunc("/vpn/", vpnHandler)
 	http.HandleFunc("/config/", configHandler)
 

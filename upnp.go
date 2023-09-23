@@ -66,7 +66,10 @@ func ConfigureUPnP(vpn model.VPN) error {
 							log.Error("External IP address does not match endpoint")
 							// Update the vpn endpoint at nettica
 							vpn.Current.Endpoint = externalIP + ":" + parts[1]
-							UpdateVPN(vpn)
+
+							if !vpn.Current.SyncEndpoint {
+								UpdateVPN(&vpn)
+							}
 						}
 					}
 
@@ -121,7 +124,9 @@ func ConfigureUPnP(vpn model.VPN) error {
 							log.Error("PPP External IP address does not match endpoint")
 							// Update the vpn endpoint at nettica
 							vpn.Current.Endpoint = externalIP + ":" + parts[1]
-							UpdateVPN(vpn)
+							if !vpn.Current.SyncEndpoint {
+								UpdateVPN(&vpn)
+							}
 						}
 					}
 
