@@ -2,7 +2,7 @@
 
 # Check arguments
 if [ $# -eq 0 ]; then
-    echo "Usage: build.sh [version] [arch] (eg. build.sh 2.0.0 amd64|arm64))"
+    echo "Usage: build.sh [version] [arch] (eg. build.sh 2.0.0 amd64|arm64|arm7l))"
     exit 1
 fi
 
@@ -15,6 +15,11 @@ echo "Building version $VERSION for $ARCH"
 export GOOS=linux
 export GOARCH=$ARCH
 export CGO_ENABLED=0
+
+if [ $GOARCH == "arm7l" ]; then
+    export GOARCH=arm
+    export GOARM=7
+fi
 
 if go build -ldflags "-X main.Version=$VERSION" ; then
     echo "Build success"
