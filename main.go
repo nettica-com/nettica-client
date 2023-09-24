@@ -29,6 +29,8 @@ func main() {
 		log.SetLevel(log.InfoLevel)
 	}
 
+	log.Infof("Nettica Client %s", Version)
+
 	err = loadConfig()
 	if err != nil && len(os.Args) < 2 {
 		log.Error("Could not load config, will load when it is ready. err= ", err)
