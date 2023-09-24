@@ -9,6 +9,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var Version = "development"
+
 func main() {
 
 	// Ensure the data directory exists

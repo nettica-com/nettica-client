@@ -1,5 +1,5 @@
 Package: nettica-client
 Version: 2.X.X
-Architecture: arm64
+Architecture: arm7l
 Maintainer: nettica.com <info@nettica.app>
-Description: nettica-client for arm64 debian distributions
+Description: nettica-client for 32-bit debian distributions

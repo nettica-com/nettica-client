@@ -1,5 +1,5 @@
 Package: nettica-client
-Version: 2.X.0
+Version: 2.X.X
 Architecture: amd64
-Maintainer: Nettica.com <info@nettica.app>
-Description: Nettica-Client of intel/amd64 debian distributions
+Maintainer: nettica.com <info@nettica.app>
+Description: nettica-client of intel/amd64 debian distributions
