@@ -1,6 +1,6 @@
 Name:           nettica
-Version:        2.0
-Release:        1%{?dist}
+Version:        2.1
+Release:        2%{?dist}
 Summary:        Nettica Client for RPM based linux systems
 
 License:        MIT

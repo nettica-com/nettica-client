@@ -1,5 +1,7 @@
 Package: nettica-client
 Version: 2.X.X
 Architecture: armhf
+Section: net
+Priority: standard
 Maintainer: nettica.com <info@nettica.app>
 Description: nettica-client for 32-bit debian distributions
