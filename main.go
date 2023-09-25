@@ -13,12 +13,6 @@ var Version = "development"
 
 func main() {
 
-	// Ensure the data directory exists
-	err := os.MkdirAll(GetDataPath(), 0755)
-	if err != nil {
-		log.Errorf("Could not create data directory: %v", err)
-	}
-
 	path := "nettica.log"
 	file, err := os.OpenFile(GetDataPath()+path, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
@@ -30,6 +24,12 @@ func main() {
 	}
 
 	log.Infof("Nettica Client %s", Version)
+
+	// Ensure the data directory exists
+	err = os.MkdirAll(GetDataPath(), 0755)
+	if err != nil {
+		log.Errorf("Could not create data directory: %v", err)
+	}
 
 	err = loadConfig()
 	if err != nil && len(os.Args) < 2 {

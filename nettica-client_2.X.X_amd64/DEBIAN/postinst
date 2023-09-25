@@ -1,0 +1,11 @@
+#!/bin/sh
+
+if [ "$1" = "configure" ]
+then
+    # Turn on IP forwarding
+    echo 1 > /proc/sys/net/ipv4/ip_forward
+    sysctl -p
+    systemctl daemon-reload
+    systemctl enable nettica.service
+    systemctl start nettica.service
+fi
