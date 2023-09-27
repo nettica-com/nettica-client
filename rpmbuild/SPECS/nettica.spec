@@ -1,6 +1,6 @@
 Name:           nettica
-Version:        2.0
-Release:        1%{?dist}
+Version:        2.1
+Release:        2%{?dist}
 Summary:        Nettica Client for RPM based linux systems
 
 License:        MIT
@@ -20,8 +20,8 @@ mkdir -p $RPM_BUILD_ROOT/usr/bin/
 mkdir -p $RPM_BUILD_ROOT/etc/nettica/
 mkdir -p $RPM_BUILD_ROOT/lib/systemd/system/
 
-cp /home/opc/go/src/nettica-client/nettica-client $RPM_BUILD_ROOT/usr/bin
-cp /home/opc/go/src/nettica-client/rpmbuild/BUILD/lib/systemd/system/nettica.service $RPM_BUILD_ROOT/lib/systemd/system/nettica.service
+cp ~/go/src/nettica-client/nettica-client $RPM_BUILD_ROOT/usr/bin
+cp ~/go/src/nettica-client/rpmbuild/BUILD/lib/systemd/system/nettica.service $RPM_BUILD_ROOT/lib/systemd/system/nettica.service
 exit
 
 

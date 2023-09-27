@@ -9,13 +9,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func main() {
+var Version = "development"
 
-	// Ensure the data directory exists
-	err := os.MkdirAll(GetDataPath(), 0744)
-	if err != nil {
-		log.Errorf("Could not create data directory: %v", err)
-	}
+func main() {
 
 	path := "nettica.log"
 	file, err := os.OpenFile(GetDataPath()+path, os.O_APPEND|os.O_WRONLY, 0644)
@@ -25,6 +21,14 @@ func main() {
 		log.SetFormatter(&log.TextFormatter{})
 		log.SetOutput(file)
 		log.SetLevel(log.InfoLevel)
+	}
+
+	log.Infof("Nettica Client %s", Version)
+
+	// Ensure the data directory exists
+	err = os.MkdirAll(GetDataPath(), 0755)
+	if err != nil {
+		log.Errorf("Could not create data directory: %v", err)
 	}
 
 	err = loadConfig()
