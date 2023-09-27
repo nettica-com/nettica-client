@@ -800,13 +800,14 @@ func UpdateNetticaConfig(body []byte) {
 
 				// Check the current file and if it's an exact match, do not bounce the service
 				path := GetWireguardPath()
+				name := msg.Config[i].NetName
 
 				force := false
 				var bits []byte
 
-				file, err := os.Open(path + msg.Config[i].NetName + ".conf")
+				file, err := os.Open(path + name + ".conf")
 				if err != nil {
-					log.Errorf("Error opening %s for read: %v", msg.Config[i].NetName, err)
+					log.Errorf("Error opening %s for read: %v", name, err)
 					force = true
 				} else {
 					bits, err = io.ReadAll(file)
@@ -818,47 +819,50 @@ func UpdateNetticaConfig(body []byte) {
 				}
 
 				if !force && bytes.Equal(bits, text) {
-					log.Infof("*** SKIPPING %s *** No changes!", msg.Config[i].NetName)
+					log.Infof("*** SKIPPING %s *** No changes!", name)
 				} else {
-					err = StopWireguard(msg.Config[i].NetName)
+					err = StopWireguard(name)
 					if err != nil {
 						log.Errorf("Error stopping wireguard: %v", err)
 					}
 
-					err = os.MkdirAll(path, 0755)
+					err = os.MkdirAll(path, 0600)
 					if err != nil {
 						log.Errorf("Error creating directory %s : %s", path, err)
 					}
 
-					err = os.WriteFile(path+msg.Config[i].NetName+".conf", text, 0600)
+					err = os.WriteFile(path+name+".conf", text, 0600)
 					if err != nil {
-						log.Errorf("Error writing file %s : %s", path+msg.Config[i].NetName+".conf", err)
+						log.Errorf("Error writing file %s : %s", path+name+".conf", err)
 					}
 
 					if !vpn.Enable {
 						// Host was disabled when we stopped wireguard above
-						log.Infof("Net %s is disabled.  Stopped service if running.", msg.Config[i].NetName)
+						log.Infof("Net %s is disabled.  Stopped service if running.", name)
 						// Stopping the service doesn't seem very reliable, stop it again
-						if err = StopWireguard(msg.Config[i].NetName); err != nil {
+						if err = StopWireguard(name); err != nil {
 							log.Errorf("Error stopping wireguard: %v", err)
 						}
 
+						msg := fmt.Sprintf("Network %s has been stopped", name)
+						Notify(msg)
+
 					} else {
 						// Start the existing service
-						err = StartWireguard(msg.Config[i].NetName)
+						err = StartWireguard(name)
 						if err == nil {
-							log.Infof("Started %s", msg.Config[i].NetName)
-							log.Infof("%s Config: %v", msg.Config[i].NetName, msg.Config[i])
-							msg := fmt.Sprintf("Network %s has been updated", msg.Config[i].NetName)
+							log.Infof("Started %s", name)
+							log.Infof("%s Config: %v", name, msg.Config[i])
+							msg := fmt.Sprintf("Network %s has been updated", name)
 							Notify(msg)
 						} else {
 							// try to install the service (on linux, just tries to start the service again)
-							err = InstallWireguard(msg.Config[i].NetName)
+							err = InstallWireguard(name)
 							if err != nil {
 								log.Errorf("Error installing wireguard: %v", err)
 							} else {
-								log.Infof("Installed %s Config: %v", msg.Config[i].NetName, msg.Config[i])
-								msg := fmt.Sprintf("Network %s has been installed", msg.Config[i].NetName)
+								log.Infof("Installed %s Config: %v", name, msg.Config[i])
+								msg := fmt.Sprintf("Network %s has been installed", name)
 								Notify(msg)
 							}
 							// Check if the private key is not blank, if it is, we need to update the server
