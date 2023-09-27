@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -147,6 +148,9 @@ func ServiceHandler(w http.ResponseWriter, req *http.Request) {
 				log.Error(err)
 			}
 		}
+		msg := fmt.Sprintf("Stopped network %s", net)
+		Notify(msg)
+		log.Info(msg)
 
 		io.WriteString(w, "")
 
@@ -170,6 +174,11 @@ func ServiceHandler(w http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			log.Error(err)
 		}
+		msg := fmt.Sprintf("Started network %s", net)
+		Notify(msg)
+		log.Info(msg)
+
+		io.WriteString(w, "")
 
 	default:
 		io.WriteString(w, "")

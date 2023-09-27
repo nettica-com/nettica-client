@@ -715,6 +715,8 @@ func UpdateNetticaConfig(body []byte) {
 						KeySave()
 					}
 				}
+				msg := fmt.Sprintf("Network %s has been removed", oldconf.Config[i].NetName)
+				Notify(msg)
 			}
 		}
 
@@ -823,7 +825,7 @@ func UpdateNetticaConfig(body []byte) {
 						log.Errorf("Error stopping wireguard: %v", err)
 					}
 
-					err = os.MkdirAll(path, 0700)
+					err = os.MkdirAll(path, 0755)
 					if err != nil {
 						log.Errorf("Error creating directory %s : %s", path, err)
 					}
@@ -847,6 +849,8 @@ func UpdateNetticaConfig(body []byte) {
 						if err == nil {
 							log.Infof("Started %s", msg.Config[i].NetName)
 							log.Infof("%s Config: %v", msg.Config[i].NetName, msg.Config[i])
+							msg := fmt.Sprintf("Network %s has been updated", msg.Config[i].NetName)
+							Notify(msg)
 						} else {
 							// try to install the service (on linux, just tries to start the service again)
 							err = InstallWireguard(msg.Config[i].NetName)
@@ -854,6 +858,8 @@ func UpdateNetticaConfig(body []byte) {
 								log.Errorf("Error installing wireguard: %v", err)
 							} else {
 								log.Infof("Installed %s Config: %v", msg.Config[i].NetName, msg.Config[i])
+								msg := fmt.Sprintf("Network %s has been installed", msg.Config[i].NetName)
+								Notify(msg)
 							}
 							// Check if the private key is not blank, if it is, we need to update the server
 							if vpn.Current.PrivateKey != "" {
