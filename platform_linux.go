@@ -86,6 +86,17 @@ func StopWireguard(netName string) error {
 
 }
 
+func IsWireguardRunning(name string) (bool, error) {
+
+	cmd := exec.Command("wg", "show", name)
+	err := cmd.Run()
+	if err != nil {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 // docker run -e NETTICA_HOST_ID=715d2d3d-2eb2-4f06-be90-4e8d679360a5 -e NETTICA_API_KEY=example -p 40000:40000 nettica-client
 
 func StartContainer(service model.Service) (string, error) {

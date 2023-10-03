@@ -109,6 +109,17 @@ func StopWireguard(netName string) error {
 
 }
 
+func IsWireguardRunning(name string) (bool, error) {
+
+	cmd := exec.Command("wg", "show", name)
+	err := cmd.Run()
+	if err != nil {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 func StartContainer(service model.Service) (string, error) {
 	return "", nil
 }

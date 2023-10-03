@@ -188,6 +188,38 @@ func StopWireguard(netName string) error {
 
 }
 
+func IsWireguardRunning(netName string) (bool, error) {
+	// Check if the wireguard service is running for the network
+	// using the service control manager
+
+	m, err := mgr.Connect()
+	if err != nil {
+		log.Errorf("Error connecting to service manager: %v", err)
+		return false, err
+	}
+	defer m.Disconnect()
+
+	service, err := m.OpenService("WireGuardTunnel$" + netName)
+	if err != nil {
+		log.Errorf("Error opening service: %v", err)
+		return false, err
+	}
+	defer service.Close()
+
+	status, err := service.Query()
+	if err != nil {
+		log.Errorf("Error querying service: %v", err)
+		return false, err
+	}
+
+	if status.State == svc.Running {
+		return true, nil
+	}
+
+	return false, nil
+
+}
+
 func StartContainer(service model.Service) (string, error) {
 	return "", nil
 }
