@@ -278,6 +278,11 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 				device.Architecture = arch
 			}
 
+			instanceid := req.URL.Query().Get("instanceid")
+			if instanceid != "" {
+				device.InstanceID = instanceid
+			}
+
 			saveConfig()
 			UpdateNetticaDevice(device)
 

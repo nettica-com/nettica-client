@@ -48,6 +48,8 @@ func DiscoverDevice(device *model.Device) {
 		return
 	}
 
+	found := false
+
 	// AWS - check the metadata service
 	// Get the instance ID from the metadata service
 	// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html
@@ -61,6 +63,7 @@ func DiscoverDevice(device *model.Device) {
 			log.Infof("AWS Instance ID: %s", device.InstanceID)
 		}
 		rsp.Body.Close()
+		found = true
 	}
 
 	// Azure - check the metadata service
@@ -77,6 +80,7 @@ func DiscoverDevice(device *model.Device) {
 				log.Infof("Azure Instance ID: %s", device.InstanceID)
 			}
 			rsp.Body.Close()
+			found = true
 		}
 	}
 
@@ -94,7 +98,12 @@ func DiscoverDevice(device *model.Device) {
 				log.Infof("Oracle Instance ID: %s", device.InstanceID)
 			}
 			rsp.Body.Close()
+			found = true
 		}
+	}
+
+	if found {
+		saveConfig()
 	}
 
 }
