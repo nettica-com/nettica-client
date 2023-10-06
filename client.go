@@ -41,12 +41,75 @@ func StartChannel(c chan []byte) {
 	}
 }
 
+func DiscoverDevice(device *model.Device) {
+
+	// don't do anything if the device is configured
+	if device.Registered {
+		return
+	}
+
+	// AWS - check the metadata service
+	// Get the instance ID from the metadata service
+	// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html
+	// GET http://169.254.169.254/latest/meta-data/instance-id
+
+	rsp, err := http.Get("http://169.254.169.254/latest/meta-data/instance-id")
+	if err == nil && rsp.StatusCode == 200 {
+		body, err := io.ReadAll(rsp.Body)
+		if err == nil {
+			device.InstanceID = string(body)
+			log.Infof("AWS Instance ID: %s", device.InstanceID)
+		}
+		rsp.Body.Close()
+	}
+
+	// Azure - check the metadata service
+	// GET http://169.254.169.254/metadata/instance/compute/vmId?api-version=2021-01-01&format=text
+
+	req, err := http.NewRequest("GET", "http://169.254.169.254/metadata/instance/vmId?api-version=2020-09-01&format=text", nil)
+	if (err == nil) && (req != nil) {
+		req.Header.Set("Metadata", "true")
+		rsp, err = http.DefaultClient.Do(req)
+		if err == nil && rsp.StatusCode == 200 {
+			body, err := io.ReadAll(rsp.Body)
+			if err == nil {
+				device.InstanceID = string(body)
+				log.Infof("Azure Instance ID: %s", device.InstanceID)
+			}
+			rsp.Body.Close()
+		}
+	}
+
+	// Oracle - check the metadata service
+	// GET curl -H "Authorization: Bearer Oracle" -L http://169.254.169.254/opc/v2/instance/id
+
+	req, err = http.NewRequest("GET", "http://169.254.169.254/opc/v2/instance/id", nil)
+	if (err == nil) && (req != nil) {
+		req.Header.Set("Authorization", "Bearer Oracle")
+		rsp, err = http.DefaultClient.Do(req)
+		if err == nil && rsp.StatusCode == 200 {
+			body, err := io.ReadAll(rsp.Body)
+			if err == nil {
+				device.InstanceID = string(body)
+				log.Infof("Oracle Instance ID: %s", device.InstanceID)
+			}
+			rsp.Body.Close()
+		}
+	}
+
+}
+
 func CallNettica(etag *string) ([]byte, error) {
 
 	server := device.Server
 
-	// don't do anything if the device is not configured
-	if device.Server == "" || device.ApiKey == "" || device.Id == "" {
+	if !device.Registered && device.InstanceID != "" {
+		device.Id = "device-id-" + device.InstanceID
+		if device.Server == "" {
+			device.Server = "https://my.nettica.com"
+		}
+	} else if device.Server == "" || device.ApiKey == "" || device.Id == "" {
+		// don't do anything if the device is not configured
 		return nil, fmt.Errorf("invalid device configuration")
 	}
 
@@ -283,6 +346,14 @@ func CompareDevices(d1 *model.Device, d2 *model.Device) bool {
 		return false
 	}
 
+	if d1.Registered != d2.Registered {
+		return false
+	}
+
+	if d1.InstanceID != d2.InstanceID {
+		return false
+	}
+
 	if d1.Name != d2.Name {
 		return false
 	}
@@ -370,9 +441,14 @@ func MergeDevices(d1 *model.Device, d2 *model.Device) {
 	}
 
 	// Some properties, like Quiet and Debug, cannot be controlled by the server
+	// InstanceID is not managed by the server
 
 	if d1.Id != d2.Id {
 		d2.Id = d1.Id
+	}
+
+	if d1.Registered {
+		d2.Registered = true
 	}
 
 	if d1.Name != "" {
@@ -678,6 +754,14 @@ func UpdateNetticaConfig(body []byte) {
 		if msg.Device.Server != device.Server {
 			log.Infof("Server has changed, new server is %s", msg.Device.Server)
 			device.Server = msg.Device.Server
+			saveConfig()
+		}
+
+		// One-Time discovery of the device
+		if device.ApiKey == "" && msg.Device.ApiKey != "" {
+			log.Infof("Device is not registered, registering")
+			device.ApiKey = msg.Device.ApiKey
+			device.Id = msg.Device.Id
 			saveConfig()
 		}
 

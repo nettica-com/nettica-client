@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/huin/goupnp v1.3.0
 	github.com/miekg/dns v1.1.56
-	github.com/nettica-com/nettica-admin v0.0.0-20230922192648-13671e5ae568
+	github.com/nettica-com/nettica-admin v0.0.0-20231004155301-11bdaa1c6ed7
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/sys v0.12.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
@@ -20,7 +20,7 @@ require (
 	github.com/gin-gonic/gin v1.9.1 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-playground/validator/v10 v10.15.4 // indirect
+	github.com/go-playground/validator/v10 v10.15.5 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect

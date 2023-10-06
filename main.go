@@ -36,6 +36,10 @@ func main() {
 		log.Error("Could not load config, will load when it is ready. err= ", err)
 	}
 
+	if device.Id == "" {
+		DiscoverDevice(&device)
+	}
+
 	d, err := GetNetticaDevice()
 	if err != nil {
 		log.Errorf("Could not get device: %v", err)

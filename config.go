@@ -79,6 +79,7 @@ func loadConfig() error {
 		device.SourceAddress = "0.0.0.0"
 		device.OS = runtime.GOOS
 		device.Architecture = runtime.GOARCH
+		device.Version = Version
 		device.Enable = true
 
 		// load defaults from environment
