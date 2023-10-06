@@ -69,7 +69,7 @@ func DiscoverDevice(device *model.Device) {
 	// Azure - check the metadata service
 	// GET http://169.254.169.254/metadata/instance/compute/vmId?api-version=2021-01-01&format=text
 
-	req, err := http.NewRequest("GET", "http://169.254.169.254/metadata/instance/vmId?api-version=2020-09-01&format=text", nil)
+	req, err := http.NewRequest("GET", "http://169.254.169.254/metadata/instance/compute/vmId?api-version=2020-09-01&format=text", nil)
 	if (err == nil) && (req != nil) {
 		req.Header.Set("Metadata", "true")
 		rsp, err = http.DefaultClient.Do(req)
