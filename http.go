@@ -224,7 +224,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 
 	switch req.Method {
 	case "GET":
-		log.Infof("Method: %s", req.Method)
+		log.Infof("Method: %s configHandler", req.Method)
 		Server := req.URL.Query().Get("server")
 		DeviceID := req.URL.Query().Get("id")
 		ApiKey := req.URL.Query().Get("apiKey")

@@ -399,7 +399,7 @@ func DoServiceWork() {
 		log.Infof("current timestamp = %v (%s)", curTs, t.UTC())
 
 		for {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(1000 * time.Millisecond)
 			ts := time.Now()
 
 			if ts.Unix() >= curTs {

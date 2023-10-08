@@ -119,7 +119,7 @@ func CallNettica(etag *string) ([]byte, error) {
 		}
 	} else if device.Server == "" || device.ApiKey == "" || device.Id == "" {
 		// don't do anything if the device is not configured
-		return nil, fmt.Errorf("invalid device configuration")
+		return nil, fmt.Errorf("no device configuration")
 	}
 
 	if client == nil {
@@ -771,6 +771,7 @@ func UpdateNetticaConfig(body []byte) {
 			log.Infof("Device is not registered, registering")
 			device.ApiKey = msg.Device.ApiKey
 			device.Id = msg.Device.Id
+			device.Registered = true
 			saveConfig()
 		}
 
@@ -1217,7 +1218,7 @@ func DoWork() {
 		log.Infof("current timestamp = %v (%s)", curTs, t.UTC())
 
 		for {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(1000 * time.Millisecond)
 			ts := time.Now()
 
 			if ts.Unix() >= curTs {

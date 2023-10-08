@@ -88,9 +88,10 @@ func loadConfig() error {
 		device.ApiKey = os.Getenv("NETTICA_API_KEY")
 		device.ServiceGroup = os.Getenv("NETTICA_SERVICE_GROUP")
 		device.ServiceApiKey = os.Getenv("NETTICA_SERVICE_API_KEY")
+		device.InstanceID = os.Getenv("NETTICA_INSTANCE_ID")
 
 		if device.Server == "" {
-			device.Server = "https://dev.nettica.com"
+			device.Server = "https://my.nettica.com"
 		}
 		device.Enable = true
 
