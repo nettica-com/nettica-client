@@ -272,19 +272,22 @@ func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 // This sends a multicast message with the DNS query to anyone listening
 func LogMessage(query string) {
 
-	raddr, err := net.ResolveUDPAddr("udp", "224.1.1.1:25264")
-	if err != nil {
-		return
-	}
+	NotifyDNS(query)
 
-	conn, err := net.DialUDP("udp", nil, raddr)
-	if err != nil {
-		return
-	}
-	defer conn.Close()
+	/*
+		raddr, err := net.ResolveUDPAddr("udp", "224.1.1.1:25264")
+		if err != nil {
+			return
+		}
 
-	conn.WriteMsgUDP([]byte(query), nil, raddr)
+		conn, err := net.DialUDP("udp", nil, raddr)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
 
-	fmt.Fprint(conn, query)
+		conn.WriteMsgUDP([]byte(query), nil, raddr)
 
+		fmt.Fprint(conn, query)
+	*/
 }

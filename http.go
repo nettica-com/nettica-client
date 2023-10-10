@@ -149,7 +149,7 @@ func ServiceHandler(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 		msg := fmt.Sprintf("Stopped network %s", net)
-		Notify(msg)
+		NotifyInfo(msg)
 		log.Info(msg)
 
 		io.WriteString(w, "")
@@ -175,7 +175,7 @@ func ServiceHandler(w http.ResponseWriter, req *http.Request) {
 			log.Error(err)
 		}
 		msg := fmt.Sprintf("Started network %s", net)
-		Notify(msg)
+		NotifyInfo(msg)
 		log.Info(msg)
 
 		io.WriteString(w, "")
