@@ -37,7 +37,7 @@ func main() {
 	}
 
 	if device.Id == "" {
-		DiscoverDevice(&device)
+		go DiscoverDevice(&device)
 	}
 
 	d, err := GetNetticaDevice()
