@@ -196,6 +196,7 @@ func CallNettica(etag *string) ([]byte, error) {
 		}
 	} else {
 		log.Errorf("ERROR: %v, continuing", err)
+		client = nil
 	}
 
 	return nil, err
@@ -1048,6 +1049,11 @@ func GetLocalSubnets() ([]*net.IPNet, error) {
 
 // This needs to be refactored with the main logic above
 func StartBackgroundRefreshService() {
+
+	// Wait for the main thread to contact Nettica at least once before starting up the VPNs
+	// on a reboot
+
+	time.Sleep(15 * time.Second)
 
 	for {
 
