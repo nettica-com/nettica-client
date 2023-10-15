@@ -19,7 +19,6 @@ import (
 var netticaDeviceStatusAPIFmt = "%s/api/v1.0/device/%s/status"
 var netticaDeviceAPIFmt = "%s/api/v1.0/device/%s"
 var netticaVPNUpdateAPIFmt = "%s/api/v1.0/vpn/%s"
-var client *http.Client
 
 // Start the channel that iterates the nettica update function
 func StartChannel(c chan []byte) {
@@ -109,6 +108,8 @@ func DiscoverDevice(device *model.Device) {
 }
 
 func CallNettica(etag *string) ([]byte, error) {
+
+	var client *http.Client
 
 	server := device.Server
 
