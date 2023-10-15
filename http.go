@@ -306,9 +306,9 @@ func startHTTPd() {
 	http.HandleFunc("/vpn/", vpnHandler)
 	http.HandleFunc("/config/", configHandler)
 
-	log.Infof("Starting web server on %s", ":53280")
+	log.Infof("Starting web server on %s", "127.0.0.1:53280")
 
-	err := http.ListenAndServe(":53280", nil)
+	err := http.ListenAndServe("127.0.0.1:53280", nil)
 	if err != nil {
 		log.Error(err)
 	}
