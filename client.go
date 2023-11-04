@@ -189,7 +189,7 @@ func CallNettica(etag *string) ([]byte, error) {
 				log.Infof("etag = %s  etag2 = %s", *etag, etag2)
 				*etag = etag2
 			} else {
-				log.Infof("etag %s is equal", etag2)
+				// log.Infof("etag %s is equal", etag2)
 			}
 			resp.Body.Close()
 
@@ -920,6 +920,13 @@ func UpdateNetticaConfig(body []byte) {
 					err = StopWireguard(name)
 					if err != nil {
 						log.Errorf("Error stopping wireguard: %v", err)
+					}
+
+					// Stop the DNS if is running
+					if vpn.Current.EnableDns {
+						address := vpn.Current.Address[0]
+						address = address[0:strings.Index(address, "/")]
+						StopDNS(address)
 					}
 
 					err = os.MkdirAll(path, 0600)

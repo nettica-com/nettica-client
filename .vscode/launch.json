@@ -10,6 +10,16 @@
         "type": "go",
         "request": "launch",
         "mode": "debug",
-        "program": "${workspaceFolder}"
-    }]
+        "program": "${workspaceFolder}",
+    },
+    {
+        // attach to a running process
+        "name": "Attach",
+        "type": "go",
+        "request": "attach",
+        "mode": "local",
+        "processId": "${command:pickProcess}"
+    }
+
+]
 }

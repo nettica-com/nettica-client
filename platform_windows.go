@@ -284,7 +284,7 @@ func InitializeDNS() error {
 	return nil
 }
 
-func LaunchDNS(address string) error {
+func LaunchDNS(address string) (*dns.Server, error) {
 
 	server := &dns.Server{Addr: address, Net: "udp", TsigSecret: nil, ReusePort: true}
 	log.Infof("Starting DNS Server on %s", address)
@@ -294,5 +294,5 @@ func LaunchDNS(address string) error {
 		}
 	}()
 
-	return nil
+	return server, nil
 }

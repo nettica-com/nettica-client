@@ -18,15 +18,19 @@ import (
 )
 
 var (
-	ServerTable map[string]string
-	ServerLock  sync.Mutex
-	DnsTable    map[string][]string
-	DnsLock     sync.Mutex
+	ServerTable  map[string]string
+	ServerLock   sync.Mutex
+	DnsTable     map[string][]string
+	DnsLock      sync.Mutex
+	Resolvers    []string
+	ResolverLock sync.Mutex
+	DnsServers   map[string]*dns.Server
 )
 
 func StartDNS() error {
 	ServerTable = make(map[string]string)
 	DnsTable = make(map[string][]string)
+	DnsServers = make(map[string]*dns.Server)
 
 	dns.HandleFunc(".", handleQueries)
 
@@ -62,6 +66,11 @@ func StartDNS() error {
 	DnsLock.Lock()
 	defer DnsLock.Unlock()
 
+	ResolverLock.Lock()
+	defer ResolverLock.Unlock()
+
+	// get the DNS servers from the config file
+
 	for i := 0; i < len(msg.Config); i++ {
 		index := -1
 		for j := 0; j < len(msg.Config[i].VPNs); j++ {
@@ -94,6 +103,7 @@ func StartDNS() error {
 					n := strings.ToLower(msg.Config[i].VPNs[j].Name)
 					if strings.Contains(msg.Config[i].VPNs[j].Current.Address[0], ":") {
 						// ipv6
+
 					} else {
 						// ipv4
 						addresses := strings.Split(msg.Config[i].VPNs[j].Current.Address[0], "/")
@@ -111,13 +121,45 @@ func StartDNS() error {
 						ServerTable[ip] = ip
 					}
 				}
+				resolvers := host.Current.Dns
+				// remove the host address from the list of resolvers
+				for j := 0; j < len(resolvers); j++ {
+					parts := strings.Split(host.Current.Address[0], "/")
+					if len(parts) > 0 && resolvers[j] == parts[0] {
+						resolvers = append(resolvers[:j], resolvers[j+1:]...)
+						break
+					}
+				}
+				Resolvers = append(Resolvers, resolvers...)
 
 				if len(host.Current.Address[0]) > 3 {
 					address := host.Current.Address[0][:len(host.Current.Address[0])-3] + ":53"
-					LaunchDNS(address)
+					server, err := LaunchDNS(address)
+					if err != nil {
+						log.Errorf("Error starting DNS server: %v", err)
+					} else {
+						DnsServers[address] = server
+					}
 				}
 			}
 		}
+	}
+
+	log.Infof("DNS Resolvers: %v", Resolvers)
+
+	return nil
+}
+
+func StopDNS(address string) error {
+
+	log.Infof("******************** STOP DNS : %s ********************", address)
+
+	address += ":53"
+	server := DnsServers[address]
+	DnsServers[address] = nil
+
+	if server != nil {
+		server.Shutdown()
 	}
 
 	return nil
@@ -127,6 +169,7 @@ func UpdateDNS(msg model.Message) error {
 
 	serverTable := make(map[string]string)
 	dnsTable := make(map[string][]string)
+	resolvers := make([]string, 0)
 
 	for i := 0; i < len(msg.Config); i++ {
 		index := -1
@@ -178,10 +221,23 @@ func UpdateDNS(msg model.Message) error {
 						serverTable[ip] = ip
 					}
 				}
-				if len(host.Current.Address[0]) > 3 {
-					address := host.Current.Address[0][:len(host.Current.Address[0])-3] + ":53"
-					LaunchDNS(address)
+				resolver := host.Current.Dns
+				// remove the host address from the list of resolvers
+				for j := 0; j < len(resolver); j++ {
+					parts := strings.Split(host.Current.Address[0], "/")
+					if len(parts) > 0 && resolver[j] == parts[0] {
+						resolver = append(resolver[:j], resolver[j+1:]...)
+						break
+					}
 				}
+
+				resolvers = append(resolvers, resolver...)
+
+				address := host.Current.Address[0]
+				address = address[0:strings.Index(address, "/")] + ":53"
+
+				server, _ := LaunchDNS(address)
+				DnsServers[address] = server
 			}
 		}
 	}
@@ -193,14 +249,16 @@ func UpdateDNS(msg model.Message) error {
 	ServerTable = serverTable
 	ServerLock.Unlock()
 
+	ResolverLock.Lock()
+	log.Infof("Update DNS Resolvers: %v", resolvers)
+	Resolvers = resolvers
+	ResolverLock.Unlock()
+
 	return nil
 }
 
 func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 	var rr dns.RR
-	m := new(dns.Msg)
-	m.SetReply(r)
-	m.Compress = true
 
 	q := strings.ToLower(r.Question[0].Name)
 	q = strings.Trim(q, ".")
@@ -209,64 +267,102 @@ func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 		log.Infof("DNS Query: %s", q)
 	}
 
-	addrs := DnsTable[q]
-	if addrs == nil {
-		m.Rcode = dns.RcodeServerFailure
-	} else {
+	switch r.Question[0].Qtype {
 
-		if r.Question[0].Qtype == dns.TypePTR {
-			rr = &dns.PTR{Hdr: dns.RR_Header{Name: r.Question[0].Name,
-				Rrtype: dns.TypePTR,
-				Class:  dns.ClassINET,
-				Ttl:    300},
-				Ptr: addrs[0] + ".",
+	case dns.TypeA, dns.TypeAAAA:
+
+		addrs := DnsTable[q]
+		if addrs != nil {
+			log.Infof("--- Query from DnsTable: %s", q)
+			m := new(dns.Msg)
+			m.SetReply(r)
+			m.Compress = true
+
+			if r.Question[0].Qtype == dns.TypePTR {
+				rr = &dns.PTR{Hdr: dns.RR_Header{Name: r.Question[0].Name,
+					Rrtype: dns.TypePTR,
+					Class:  dns.ClassINET,
+					Ttl:    300},
+					Ptr: addrs[0] + ".",
+				}
+				m.Answer = append(m.Answer, rr)
+				m.Authoritative = true
+				m.Rcode = dns.RcodeSuccess
 			}
-			m.Answer = append(m.Answer, rr)
-			m.Authoritative = true
-			m.Rcode = dns.RcodeSuccess
-		}
 
-		if r.Question[0].Qtype == dns.TypeA {
-			offset := rand.Intn(len(addrs))
-			for i := 0; i < len(addrs); i++ {
-				x := (offset + i) % len(addrs)
-				if !strings.Contains(addrs[x], ":") {
-					ip, _, _ := net.ParseCIDR(addrs[x])
-					rr = &dns.A{Hdr: dns.RR_Header{Name: r.Question[0].Name,
-						Rrtype: dns.TypeA,
-						Class:  dns.ClassINET,
-						Ttl:    300},
-						A: ip.To4(),
+			if r.Question[0].Qtype == dns.TypeA {
+				offset := rand.Intn(len(addrs))
+				for i := 0; i < len(addrs); i++ {
+					x := (offset + i) % len(addrs)
+					if !strings.Contains(addrs[x], ":") {
+						ip, _, _ := net.ParseCIDR(addrs[x])
+						rr = &dns.A{Hdr: dns.RR_Header{Name: r.Question[0].Name,
+							Rrtype: dns.TypeA,
+							Class:  dns.ClassINET,
+							Ttl:    300},
+							A: ip.To4(),
+						}
+						m.Answer = append(m.Answer, rr)
+						m.Authoritative = true
+						m.Rcode = dns.RcodeSuccess
 					}
-					m.Answer = append(m.Answer, rr)
-					m.Authoritative = true
-					m.Rcode = dns.RcodeSuccess
 				}
 			}
-		}
-		if r.Question[0].Qtype == dns.TypeAAAA {
-			offset := rand.Intn(len(addrs))
-			for i := 0; i < len(addrs); i++ {
-				x := (offset + i) % len(addrs)
-				if strings.Contains(addrs[x], ":") {
-					ip, _, _ := net.ParseCIDR(addrs[x])
-					rr = &dns.AAAA{Hdr: dns.RR_Header{Name: r.Question[0].Name,
-						Rrtype: dns.TypeAAAA,
-						Class:  dns.ClassINET,
-						Ttl:    300},
-						AAAA: ip.To16(),
+			if r.Question[0].Qtype == dns.TypeAAAA {
+				offset := rand.Intn(len(addrs))
+				for i := 0; i < len(addrs); i++ {
+					x := (offset + i) % len(addrs)
+					if strings.Contains(addrs[x], ":") {
+						ip, _, _ := net.ParseCIDR(addrs[x])
+						rr = &dns.AAAA{Hdr: dns.RR_Header{Name: r.Question[0].Name,
+							Rrtype: dns.TypeAAAA,
+							Class:  dns.ClassINET,
+							Ttl:    300},
+							AAAA: ip.To16(),
+						}
+						m.Answer = append(m.Answer, rr)
+						m.Authoritative = true
+						m.Rcode = dns.RcodeSuccess
 					}
-					m.Answer = append(m.Answer, rr)
-					m.Authoritative = true
-					m.Rcode = dns.RcodeSuccess
 				}
 			}
+			w.WriteMsg(m)
+			go LogMessage(q)
+			return
+		} else {
+			QueryDNS(w, r)
+			return
 		}
 	}
 
-	w.WriteMsg(m)
-	go LogMessage(q)
+	QueryDNS(w, r)
+	return
 
+}
+
+// Make a recursive query
+func QueryDNS(w dns.ResponseWriter, r *dns.Msg) {
+	go LogMessage(r.Question[0].Name)
+	c := new(dns.Client)
+	c.Net = "udp"
+	c.Timeout = 5000 * time.Millisecond
+
+	// Measure the time it takes to get a response
+	start := time.Now()
+
+	for i := 0; i < len(Resolvers); i++ {
+		log.Infof("*** Resolver: %s Query: %s", Resolvers[i], r.Question[0].Name)
+		r, _, err := c.Exchange(r, Resolvers[i]+":53")
+		end := time.Now()
+		if err == nil {
+			took := end.Sub(start)
+			log.Infof("*** Response: (%v) %v", took, r)
+			w.WriteMsg(r)
+			return
+		} else {
+			log.Errorf("*** Error:   %v", err)
+		}
+	}
 }
 
 // This sends a multicast message with the DNS query to anyone listening
