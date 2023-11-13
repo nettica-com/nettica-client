@@ -188,8 +188,6 @@ func CallNettica(etag *string) ([]byte, error) {
 			if *etag != etag2 {
 				log.Infof("etag = %s  etag2 = %s", *etag, etag2)
 				*etag = etag2
-			} else {
-				// log.Infof("etag %s is equal", etag2)
 			}
 			resp.Body.Close()
 

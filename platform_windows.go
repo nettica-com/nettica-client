@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"golang.org/x/sys/windows/svc"
@@ -33,6 +34,7 @@ func Platform() string {
 }
 
 func GetStats(net string) (string, error) {
+	net = Sanitize(net)
 	args := []string{"show", net, "transfer"}
 	out, err := exec.Command("wg.exe", args...).Output()
 	if err != nil {
@@ -42,7 +44,31 @@ func GetStats(net string) (string, error) {
 	return string(out), nil
 }
 
+func Sanitize(s string) string {
+
+	// remove path and shell special characters
+	s = strings.Replace(s, "/", "", -1)
+	s = strings.Replace(s, "\\", "", -1)
+	s = strings.Replace(s, ":", "", -1)
+	s = strings.Replace(s, "*", "", -1)
+	s = strings.Replace(s, "?", "", -1)
+	s = strings.Replace(s, "\"", "", -1)
+	s = strings.Replace(s, "<", "", -1)
+	s = strings.Replace(s, ">", "", -1)
+	s = strings.Replace(s, "|", "", -1)
+	s = strings.Replace(s, "&", "", -1)
+	s = strings.Replace(s, "%", "", -1)
+	s = strings.Replace(s, "$", "", -1)
+	s = strings.Replace(s, "#", "", -1)
+	s = strings.Replace(s, "@", "", -1)
+	s = strings.Replace(s, "!", "", -1)
+
+	return s
+}
+
 func InstallWireguard(netName string) error {
+
+	netName = Sanitize(netName)
 
 	time.Sleep(1 * time.Second)
 
@@ -101,6 +127,8 @@ func InstallWireguard(netName string) error {
 
 func RemoveWireguard(netName string) error {
 
+	netName = Sanitize(netName)
+
 	args := []string{"/uninstalltunnelservice", netName}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -133,6 +161,8 @@ func RemoveWireguard(netName string) error {
 // StartWireguard restarts the wireguard tunnel on the given platform
 func StartWireguard(netName string) error {
 
+	netName = Sanitize(netName)
+
 	// Start the existing wireguard service
 	// example: net stop WireGuardTunnel$london
 
@@ -162,6 +192,8 @@ func StartWireguard(netName string) error {
 // StopWireguard stops the wireguard tunnel on the given platform
 func StopWireguard(netName string) error {
 
+	netName = Sanitize(netName)
+
 	// Stop the existing wireguard service
 	// example: net stop WireGuardTunnel$london
 
@@ -189,6 +221,9 @@ func StopWireguard(netName string) error {
 }
 
 func IsWireguardRunning(netName string) (bool, error) {
+
+	netName = Sanitize(netName)
+
 	// Check if the wireguard service is running for the network
 	// using the service control manager
 

@@ -27,7 +27,32 @@ func Platform() string {
 	return "Linux"
 }
 
+func Sanitize(s string) string {
+
+	// remove path and shell special characters
+	s = strings.Replace(s, "/", "", -1)
+	s = strings.Replace(s, "\\", "", -1)
+	s = strings.Replace(s, ":", "", -1)
+	s = strings.Replace(s, "*", "", -1)
+	s = strings.Replace(s, "?", "", -1)
+	s = strings.Replace(s, "\"", "", -1)
+	s = strings.Replace(s, "<", "", -1)
+	s = strings.Replace(s, ">", "", -1)
+	s = strings.Replace(s, "|", "", -1)
+	s = strings.Replace(s, "&", "", -1)
+	s = strings.Replace(s, "%", "", -1)
+	s = strings.Replace(s, "$", "", -1)
+	s = strings.Replace(s, "#", "", -1)
+	s = strings.Replace(s, "@", "", -1)
+	s = strings.Replace(s, "!", "", -1)
+
+	return s
+}
+
 func GetStats(net string) (string, error) {
+
+	net = Sanitize(net)
+
 	args := []string{"show", net, "transfer"}
 
 	out, err := exec.Command("wg", args...).Output()
@@ -49,6 +74,8 @@ func RemoveWireguard(netName string) error {
 
 func StartWireguard(netName string) error {
 
+	netName = Sanitize(netName)
+
 	args := []string{"wg-quick", "up", netName}
 
 	cmd := exec.Command("/bin/bash", args...)
@@ -65,6 +92,8 @@ func StartWireguard(netName string) error {
 }
 
 func StopWireguard(netName string) error {
+
+	netName = Sanitize(netName)
 
 	args := []string{"wg-quick", "down", netName}
 
@@ -87,6 +116,8 @@ func StopWireguard(netName string) error {
 }
 
 func IsWireguardRunning(name string) (bool, error) {
+
+	name = Sanitize(name)
 
 	cmd := exec.Command("wg", "show", name)
 	err := cmd.Run()

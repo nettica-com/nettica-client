@@ -56,7 +56,7 @@ func reloadConfig() error {
 
 	log.Infof("Server:   %s", device.Server)
 	log.Infof("DeviceID: %s", device.Id)
-	log.Infof("ApiKey:   %s", device.ApiKey)
+	log.Infof("ApiKey:   %s...", device.ApiKey[0:len(device.ApiKey)-len(device.ApiKey)/2])
 	log.Infof("CheckInterval:   %d", device.CheckInterval)
 	log.Infof("Quiet:    %t", device.Quiet)
 
@@ -164,7 +164,7 @@ func loadConfig() error {
 		cfg.loaded = true
 		log.Infof("Server:   %s", device.Server)
 		log.Infof("DeviceID: %s", device.Id)
-		log.Infof("ApiKey:   %s", device.ApiKey)
+		log.Infof("ApiKey:   %s...", device.ApiKey[0:len(device.ApiKey)-len(device.ApiKey)/2])
 		log.Infof("Quiet:    %t", device.Quiet)
 
 	} else {
@@ -180,7 +180,7 @@ func loadConfig() error {
 
 		log.Infof("Server:   %s", device.Server)
 		log.Infof("DeviceID: %s", device.Id)
-		log.Infof("ApiKey:   %s", device.ApiKey)
+		log.Infof("ApiKey:   %s...", device.ApiKey[0:len(device.ApiKey)-len(device.ApiKey)/2])
 		log.Infof("Quiet:    %t", device.Quiet)
 
 		cfg.loaded = true

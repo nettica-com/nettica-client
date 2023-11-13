@@ -336,7 +336,6 @@ func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 	}
 
 	QueryDNS(w, r)
-	return
 
 }
 

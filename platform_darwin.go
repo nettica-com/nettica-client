@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/miekg/dns"
@@ -25,7 +26,31 @@ func Platform() string {
 	return "MacOS"
 }
 
+func Sanitize(s string) string {
+
+	// remove path and shell special characters
+	s = strings.Replace(s, "/", "", -1)
+	s = strings.Replace(s, "\\", "", -1)
+	s = strings.Replace(s, ":", "", -1)
+	s = strings.Replace(s, "*", "", -1)
+	s = strings.Replace(s, "?", "", -1)
+	s = strings.Replace(s, "\"", "", -1)
+	s = strings.Replace(s, "<", "", -1)
+	s = strings.Replace(s, ">", "", -1)
+	s = strings.Replace(s, "|", "", -1)
+	s = strings.Replace(s, "&", "", -1)
+	s = strings.Replace(s, "%", "", -1)
+	s = strings.Replace(s, "$", "", -1)
+	s = strings.Replace(s, "#", "", -1)
+	s = strings.Replace(s, "@", "", -1)
+	s = strings.Replace(s, "!", "", -1)
+
+	return s
+}
+
 func GetStats(net string) (string, error) {
+
+	net = Sanitize(net)
 
 	// find the utun interface from the network name
 
@@ -56,6 +81,8 @@ func RemoveWireguard(netName string) error {
 }
 
 func StartWireguard(netName string) error {
+
+	netName = Sanitize(netName)
 
 	go func() {
 
@@ -90,6 +117,8 @@ func StartWireguard(netName string) error {
 }
 func StopWireguard(netName string) error {
 
+	netName = Sanitize(netName)
+
 	args := []string{"wg-quick", "down", netName}
 
 	cmd := exec.Command("./bash", args...)
@@ -110,6 +139,8 @@ func StopWireguard(netName string) error {
 }
 
 func IsWireguardRunning(name string) (bool, error) {
+
+	name = Sanitize(name)
 
 	cmd := exec.Command("wg", "show", name)
 	err := cmd.Run()
