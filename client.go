@@ -966,20 +966,6 @@ func UpdateNetticaConfig(body []byte) {
 								msg := fmt.Sprintf("Network %s has been installed", name)
 								NotifyInfo(msg)
 							}
-							// Check if the private key is not blank, if it is, we need to update the server
-							if vpn.Current.PrivateKey != "" {
-								// delete the old public key
-								KeyDelete(vpn.Current.PublicKey)
-								// Generate a new private key
-								wg, _ := wgtypes.GeneratePrivateKey()
-								privateKey := wg.String()
-								vpn.Current.PublicKey = wg.PublicKey().String()
-								vpn.Current.PrivateKey = ""
-								KeyAdd(vpn.Current.PublicKey, privateKey)
-								KeySave()
-								UpdateVPN(&vpn)
-							}
-
 						}
 					}
 				}
