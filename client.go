@@ -54,50 +54,79 @@ func DiscoverDevice(device *model.Device) {
 	// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html
 	// GET http://169.254.169.254/latest/meta-data/instance-id
 
-	rsp, err := http.Get("http://169.254.169.254/latest/meta-data/instance-id")
-	if err == nil && rsp.StatusCode == 200 {
-		body, err := io.ReadAll(rsp.Body)
-		if err == nil {
-			device.InstanceID = string(body)
-			log.Infof("AWS Instance ID: %s", device.InstanceID)
+	req, err := http.NewRequest("PUT", "http://169.254.169.254/latest/api/token", nil)
+	if (err == nil) && (req != nil) {
+		req.Header.Set("X-aws-ec2-metadata-token-ttl-seconds", "300")
+		rsp, err := http.DefaultClient.Do(req)
+
+		if err == nil && rsp.StatusCode == 200 {
+			body, err := io.ReadAll(rsp.Body)
+			if err == nil {
+				token := string(body)
+				log.Infof("AWS Token: %s", token)
+				rsp.Body.Close()
+
+				req, err = http.NewRequest("GET", "http://169.254.169.254/latest/meta-data/instance-id", nil)
+				if (err == nil) && (req != nil) {
+					req.Header.Set("X-aws-ec2-metadata-token", token)
+					rsp, err = http.DefaultClient.Do(req)
+					if err == nil && rsp.StatusCode == 200 {
+						body, err := io.ReadAll(rsp.Body)
+						if err == nil {
+							device.InstanceID = string(body)
+							log.Infof("AWS Instance ID: %s", device.InstanceID)
+						}
+						rsp.Body.Close()
+						found = true
+					}
+				}
+			} else {
+				log.Infof("AWS Meta-data Error: %v", err)
+				rsp.Body.Close()
+			}
+		} else {
+			log.Infof("AWS Token Error: %v", err)
+			rsp.Body.Close()
 		}
-		rsp.Body.Close()
-		found = true
 	}
 
 	// Azure - check the metadata service
 	// GET http://169.254.169.254/metadata/instance/compute/vmId?api-version=2021-01-01&format=text
 
-	req, err := http.NewRequest("GET", "http://169.254.169.254/metadata/instance/compute/vmId?api-version=2020-09-01&format=text", nil)
-	if (err == nil) && (req != nil) {
-		req.Header.Set("Metadata", "true")
-		rsp, err = http.DefaultClient.Do(req)
-		if err == nil && rsp.StatusCode == 200 {
-			body, err := io.ReadAll(rsp.Body)
-			if err == nil {
-				device.InstanceID = string(body)
-				log.Infof("Azure Instance ID: %s", device.InstanceID)
+	if !found {
+		req, err := http.NewRequest("GET", "http://169.254.169.254/metadata/instance/compute/vmId?api-version=2020-09-01&format=text", nil)
+		if (err == nil) && (req != nil) {
+			req.Header.Set("Metadata", "true")
+			rsp, err := http.DefaultClient.Do(req)
+			if err == nil && rsp.StatusCode == 200 {
+				body, err := io.ReadAll(rsp.Body)
+				if err == nil {
+					device.InstanceID = string(body)
+					log.Infof("Azure Instance ID: %s", device.InstanceID)
+				}
+				rsp.Body.Close()
+				found = true
 			}
-			rsp.Body.Close()
-			found = true
 		}
 	}
 
 	// Oracle - check the metadata service
 	// GET curl -H "Authorization: Bearer Oracle" -L http://169.254.169.254/opc/v2/instance/id
 
-	req, err = http.NewRequest("GET", "http://169.254.169.254/opc/v2/instance/id", nil)
-	if (err == nil) && (req != nil) {
-		req.Header.Set("Authorization", "Bearer Oracle")
-		rsp, err = http.DefaultClient.Do(req)
-		if err == nil && rsp.StatusCode == 200 {
-			body, err := io.ReadAll(rsp.Body)
-			if err == nil {
-				device.InstanceID = string(body)
-				log.Infof("Oracle Instance ID: %s", device.InstanceID)
+	if !found {
+		req, err := http.NewRequest("GET", "http://169.254.169.254/opc/v2/instance/id", nil)
+		if (err == nil) && (req != nil) {
+			req.Header.Set("Authorization", "Bearer Oracle")
+			rsp, err := http.DefaultClient.Do(req)
+			if err == nil && rsp.StatusCode == 200 {
+				body, err := io.ReadAll(rsp.Body)
+				if err == nil {
+					device.InstanceID = string(body)
+					log.Infof("Oracle Instance ID: %s", device.InstanceID)
+				}
+				rsp.Body.Close()
+				found = true
 			}
-			rsp.Body.Close()
-			found = true
 		}
 	}
 
