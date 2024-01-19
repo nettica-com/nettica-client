@@ -136,9 +136,9 @@ func DiscoverDevice(device *model.Device) {
 
 }
 
-func CallNettica(etag *string) ([]byte, error) {
+var client *http.Client
 
-	var client *http.Client
+func CallNettica(etag *string) ([]byte, error) {
 
 	server := device.Server
 
@@ -182,6 +182,7 @@ func CallNettica(etag *string) ([]byte, error) {
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
+		client = nil
 		return nil, err
 	}
 	if req != nil {
@@ -634,6 +635,7 @@ func GetNetticaVPN(etag string) (string, error) {
 
 	body, err := CallNettica(&etag)
 	if err != nil {
+		client = nil
 		if err.Error() == "Unauthorized" {
 			log.Errorf("Unauthorized - reload config")
 			// Read the config and find another API key

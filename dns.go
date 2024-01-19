@@ -130,7 +130,18 @@ func StartDNS() error {
 						break
 					}
 				}
+
 				Resolvers = append(Resolvers, resolvers...)
+
+				// Eliminate any duplicates in the Resolvers list
+				for i := 0; i < len(Resolvers); i++ {
+					for j := i + 1; j < len(Resolvers); j++ {
+						if Resolvers[i] == Resolvers[j] {
+							Resolvers = append(Resolvers[:j], Resolvers[j+1:]...)
+							j--
+						}
+					}
+				}
 
 				if len(host.Current.Address[0]) > 3 {
 					address := host.Current.Address[0][:len(host.Current.Address[0])-3] + ":53"
@@ -232,6 +243,16 @@ func UpdateDNS(msg model.Message) error {
 				}
 
 				resolvers = append(resolvers, resolver...)
+
+				// Eliminate any duplicates in the resolvers list
+				for i := 0; i < len(resolvers); i++ {
+					for j := i + 1; j < len(resolvers); j++ {
+						if resolvers[i] == resolvers[j] {
+							resolvers = append(resolvers[:j], resolvers[j+1:]...)
+							j--
+						}
+					}
+				}
 
 				address := host.Current.Address[0]
 				address = address[0:strings.Index(address, "/")] + ":53"
