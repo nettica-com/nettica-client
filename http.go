@@ -131,13 +131,16 @@ func ServiceHandler(w http.ResponseWriter, req *http.Request) {
 
 	switch req.Method {
 	case "DELETE":
-		log.Infof("StopWireguard(%s)", net)
-		log.Infof("Method: %s", req.Method)
-		err := StopWireguard(net)
+		vpn, err := FindVPN(net)
 		if err != nil {
 			log.Error(err)
+			// return an error
+			w.WriteHeader(http.StatusNotFound)
+			return
 		}
-		vpn, err := FindVPN(net)
+		log.Infof("StopWireguard(%s)", net)
+		log.Infof("Method: %s", req.Method)
+		err = StopWireguard(net)
 		if err != nil {
 			log.Error(err)
 		}
@@ -161,6 +164,9 @@ func ServiceHandler(w http.ResponseWriter, req *http.Request) {
 		vpn, err := FindVPN(net)
 		if err != nil {
 			log.Error(err)
+			// return an error
+			w.WriteHeader(http.StatusNotFound)
+			return
 		}
 		if vpn != nil {
 			vpn.Enable = true
