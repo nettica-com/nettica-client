@@ -791,6 +791,12 @@ func UpdateNetticaConfig(body []byte) {
 			return
 		}
 
+		if (msg.Device.CheckInterval != 0) && (msg.Device.CheckInterval != device.CheckInterval) {
+			log.Infof("CheckInterval has changed, new interval is %d", msg.Device.CheckInterval)
+			device.CheckInterval = msg.Device.CheckInterval
+			saveConfig()
+		}
+
 		if msg.Device.Server != device.Server {
 			log.Infof("Server has changed, new server is %s", msg.Device.Server)
 			device.Server = msg.Device.Server
