@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -181,14 +182,18 @@ func CallNettica(etag *string) ([]byte, error) {
 		log.Infof("  GET %s", reqURL)
 	}
 
-	req, err := http.NewRequest("GET", reqURL, nil)
+	// Create a context with a 15 second timeout
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(15*time.Second))
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
 	if err != nil {
 		client = nil
 		return nil, err
 	}
 	if req != nil {
 		req.Header.Set("X-API-KEY", device.ApiKey)
-		req.Header.Set("User-Agent", "nettica-client/2.0")
+		req.Header.Set("User-Agent", "nettica-client/"+Version)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("If-None-Match", *etag)
 	}
@@ -271,13 +276,17 @@ func GetNetticaDevice() (*model.Device, error) {
 		log.Infof("  GET %s", reqURL)
 	}
 
-	req, err := http.NewRequest("GET", reqURL, nil)
+	// Create a context with a 15 second timeout
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(15*time.Second))
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
 	if err != nil {
 		return nil, err
 	}
 	if req != nil {
 		req.Header.Set("X-API-KEY", device.ApiKey)
-		req.Header.Set("User-Agent", "nettica-client/2.0")
+		req.Header.Set("User-Agent", "nettica-client/"+Version)
 		req.Header.Set("Content-Type", "application/json")
 	}
 	resp, err := client.Do(req)
@@ -341,13 +350,17 @@ func DeleteVPN(id string) error {
 		log.Infof("  DELETE %s", reqURL)
 	}
 
-	req, err := http.NewRequest("DELETE", reqURL, nil)
+	// Create a context with a 15 second timeout
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(15*time.Second))
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "DELETE", reqURL, nil)
 	if err != nil {
 		return err
 	}
 	if req != nil {
 		req.Header.Set("X-API-KEY", device.ApiKey)
-		req.Header.Set("User-Agent", "nettica-client/2.0")
+		req.Header.Set("User-Agent", "nettica-client/"+Version)
 		req.Header.Set("Content-Type", "application/json")
 	}
 	resp, err := client.Do(req)
@@ -592,13 +605,17 @@ func UpdateNetticaDevice(d model.Device) error {
 		return err
 	}
 
-	req, err := http.NewRequest("PATCH", reqURL, bytes.NewBuffer(content))
+	// Create a context with a 15 second timeout
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(15*time.Second))
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "PATCH", reqURL, bytes.NewBuffer(content))
 	if err != nil {
 		return err
 	}
 	if req != nil {
 		req.Header.Set("X-API-KEY", device.ApiKey)
-		req.Header.Set("User-Agent", "nettica-client/2.0")
+		req.Header.Set("User-Agent", "nettica-client/"+Version)
 		req.Header.Set("Content-Type", "application/json")
 	}
 
@@ -689,13 +706,17 @@ func UpdateVPN(vpn *model.VPN) error {
 		return err
 	}
 
-	req, err := http.NewRequest("PATCH", reqURL, bytes.NewBuffer(content))
+	// Create a context with a 15 second timeout
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(15*time.Second))
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "PATCH", reqURL, bytes.NewBuffer(content))
 	if err != nil {
 		return err
 	}
 	if req != nil {
 		req.Header.Set("X-API-KEY", device.ApiKey)
-		req.Header.Set("User-Agent", "nettica-client/2.0")
+		req.Header.Set("User-Agent", "nettica-client/"+Version)
 		req.Header.Set("Content-Type", "application/json")
 	}
 
