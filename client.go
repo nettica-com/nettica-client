@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -794,6 +795,24 @@ func UpdateNetticaConfig(body []byte) {
 		if (msg.Device.CheckInterval != 0) && (msg.Device.CheckInterval != device.CheckInterval) {
 			log.Infof("CheckInterval has changed, new interval is %d", msg.Device.CheckInterval)
 			device.CheckInterval = msg.Device.CheckInterval
+			saveConfig()
+		}
+
+		if msg.Device.Quiet != device.Quiet {
+			log.Infof("Quiet has changed, new quiet is %t", msg.Device.Quiet)
+			device.Quiet = msg.Device.Quiet
+			saveConfig()
+		}
+
+		if msg.Device.Description != device.Description {
+			log.Infof("Description has changed, new description is %s", msg.Device.Description)
+			device.Description = msg.Device.Description
+			saveConfig()
+		}
+
+		if !slices.Equal(msg.Device.Tags, device.Tags) {
+			log.Infof("Tags have changed, new tags are %v", msg.Device.Tags)
+			device.Tags = msg.Device.Tags
 			saveConfig()
 		}
 
