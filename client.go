@@ -915,10 +915,12 @@ func UpdateNetticaConfig(body []byte) {
 						log.Errorf("Error saving key: %s %s", vpn.Current.PublicKey, vpn.Current.PrivateKey)
 					}
 
-					// clear out the private key and update the server
-					vpn2 := vpn
-					vpn2.Current.PrivateKey = ""
-					UpdateVPN(&vpn2)
+					if device.UpdateKeys {
+						// clear out the private key and update the server
+						vpn2 := vpn
+						vpn2.Current.PrivateKey = ""
+						UpdateVPN(&vpn2)
+					}
 
 					key, _ = KeyLookup(vpn.Current.PublicKey)
 				}

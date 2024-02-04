@@ -81,6 +81,7 @@ func loadConfig() error {
 		device.Architecture = runtime.GOARCH
 		device.Version = Version
 		device.Enable = true
+		device.UpdateKeys = true
 
 		// load defaults from environment
 		device.Server = os.Getenv("NETTICA_SERVER")
@@ -89,6 +90,9 @@ func loadConfig() error {
 		device.ServiceGroup = os.Getenv("NETTICA_SERVICE_GROUP")
 		device.ServiceApiKey = os.Getenv("NETTICA_SERVICE_API_KEY")
 		device.InstanceID = os.Getenv("NETTICA_INSTANCE_ID")
+		if os.Getenv("NETTICA_UPDATE_KEYS") == "false" {
+			device.UpdateKeys = false
+		}
 
 		if device.Server == "" {
 			device.Server = "https://my.nettica.com"
