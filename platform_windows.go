@@ -79,7 +79,7 @@ func InstallWireguard(netName string) error {
 	cmd.Stderr = &out
 	err := cmd.Run()
 	if err != nil {
-		log.Errorf("Error installing WireGuard tunnel: %v (%s)", err, out.String())
+		log.Errorf("Error installing WireGuard tunnel %s: %v (%s)", netName, err, out.String())
 		return err
 	}
 
