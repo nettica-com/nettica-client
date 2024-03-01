@@ -36,6 +36,16 @@ func main() {
 		log.Error("Could not load config, will load when it is ready. err= ", err)
 	}
 
+	log.SetLevel(log.InfoLevel)
+
+	if device.Quiet {
+		log.SetLevel(log.ErrorLevel)
+	}
+
+	if device.Debug {
+		log.SetLevel(log.DebugLevel)
+	}
+
 	if device.Id == "" {
 		go DiscoverDevice(&device)
 	}

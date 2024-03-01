@@ -65,8 +65,8 @@ func GetStats(net string) (string, error) {
 
 	out, err := exec.Command("./wg", args...).Output()
 	if err != nil {
-		log.Errorf("Error getting statistics: %v (%s)", err, string(out))
-		return "", err
+		log.Debugf("Error getting statistics: %v (%s)", err, string(out))
+		return "nodata 0 0", err
 	}
 
 	return string(out), nil

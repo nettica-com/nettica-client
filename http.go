@@ -69,16 +69,16 @@ func statsHandler(w http.ResponseWriter, req *http.Request) {
 
 	// GetStats will execute "wg show net transfer" and return the output
 	body, err := GetStats(net)
-	if err != nil {
+	if err != nil && !device.Quiet && device.Debug {
 		log.Error(err)
 	}
 
 	// which we then make into a json structure and return it
 	stats, err := MakeStats(net, body)
-	if err != nil {
+	if err != nil && !device.Quiet && device.Debug {
 		log.Error(err)
 	}
-	if !device.Quiet {
+	if !device.Quiet && device.Debug {
 		log.Infof("Stats: %s", stats)
 	}
 	w.Header().Add("Access-Control-Allow-Origin", "*")
