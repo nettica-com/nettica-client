@@ -325,7 +325,7 @@ func LaunchDNS(address string) (*dns.Server, error) {
 	log.Infof("Starting DNS Server on %s", address)
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
-			log.Errorf("Failed to setup the DNS server on %s: %s\n", address, err.Error())
+			log.Warnf("Failed to setup the DNS server on %s: %s\n", address, err.Error())
 		}
 	}()
 

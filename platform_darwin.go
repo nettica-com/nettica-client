@@ -195,7 +195,7 @@ func InitializeDNS() error {
 	go func() {
 		server := &dns.Server{Addr: "127.0.0.1:53", Net: "udp", TsigSecret: nil, ReusePort: true}
 		if err := server.ListenAndServe(); err != nil {
-			log.Errorf("UpdateDNS: Failed to setup the DNS server on %s: %s\n", "127.0.0.1:53", err.Error())
+			log.Warnf("UpdateDNS: Failed to setup the DNS server on %s: %s\n", "127.0.0.1:53", err.Error())
 		}
 
 	}()
