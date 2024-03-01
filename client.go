@@ -88,7 +88,6 @@ func DiscoverDevice(device *model.Device) {
 			}
 		} else {
 			log.Infof("AWS Token Error: %v", err)
-			rsp.Body.Close()
 		}
 	}
 
