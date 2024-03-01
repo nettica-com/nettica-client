@@ -74,7 +74,7 @@ func loadConfig() error {
 
 		// configure defaults
 		device.Debug = false
-		device.Quiet = false
+		device.Quiet = true
 		device.CheckInterval = 10
 		device.SourceAddress = "0.0.0.0"
 		device.OS = runtime.GOOS
