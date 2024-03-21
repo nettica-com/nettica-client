@@ -528,10 +528,6 @@ func MergeDevices(d1 *model.Device, d2 *model.Device) {
 		d2.Platform = d1.Platform
 	}
 
-	if d1.Version != "" {
-		d2.Version = d1.Version
-	}
-
 	if d1.SourceAddress != "" {
 		d2.SourceAddress = d1.SourceAddress
 	}

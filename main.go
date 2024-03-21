@@ -46,7 +46,7 @@ func main() {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	if device.Id == "" {
+	if device.Id == "" && !device.Registered {
 		go DiscoverDevice(&device)
 	}
 
