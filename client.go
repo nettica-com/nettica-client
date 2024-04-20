@@ -1017,10 +1017,11 @@ func UpdateNetticaConfig(body []byte) {
 						// Stopping the service doesn't seem very reliable, stop it again
 						if err = StopWireguard(name); err != nil {
 							log.Errorf("Error stopping wireguard: %v", err)
+						} else {
+							log.Infof("Stopped %s", name)
+							msg := fmt.Sprintf("Network %s has been stopped", name)
+							NotifyInfo(msg)
 						}
-
-						msg := fmt.Sprintf("Network %s has been stopped", name)
-						NotifyInfo(msg)
 
 					} else {
 						// Start the existing service
