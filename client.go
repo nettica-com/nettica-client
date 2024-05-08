@@ -18,6 +18,10 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
+// Global variable for status changes
+var SuccessStatus bool = true
+var Bounce = false
+
 var netticaDeviceStatusAPIFmt = "%s/api/v1.0/device/%s/status"
 var netticaDeviceAPIFmt = "%s/api/v1.0/device/%s"
 var netticaVPNUpdateAPIFmt = "%s/api/v1.0/vpn/%s"
@@ -38,6 +42,13 @@ func StartChannel(c chan []byte) {
 		etag, err = GetNetticaVPN(etag)
 		if err != nil {
 			log.Errorf("Error getting nettica device: %v", err)
+			SuccessStatus = false
+		} else {
+			if !SuccessStatus {
+				SuccessStatus = true
+				Bounce = true
+				NotifyInfo("Network change detected.  Checking for updates...")
+			}
 		}
 	}
 }
@@ -741,6 +752,10 @@ func UpdateVPN(vpn *model.VPN) error {
 // UpdateNetticaConfig updates the config from the server
 func UpdateNetticaConfig(body []byte) {
 
+	defer func() {
+		Bounce = false
+	}()
+
 	// If the file doesn't exist create it for the first time
 	if _, err := os.Stat(GetDataPath() + "nettica.json"); os.IsNotExist(err) {
 		file, err := os.OpenFile(GetDataPath()+"nettica.json", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
@@ -763,7 +778,7 @@ func UpdateNetticaConfig(body []byte) {
 	}
 
 	// compare the body to the current config and make no changes if they are the same
-	if bytes.Equal(conf, body) {
+	if bytes.Equal(conf, body) && !Bounce {
 		return
 	} else {
 		log.Info("Config has changed, updating nettica.json")
