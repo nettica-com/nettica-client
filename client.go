@@ -19,19 +19,28 @@ import (
 )
 
 // Global variable for status changes
-var SuccessStatus bool = true
-var Bounce = false
+var (
+	Bounce = false
+)
 
-var netticaDeviceStatusAPIFmt = "%s/api/v1.0/device/%s/status"
-var netticaDeviceAPIFmt = "%s/api/v1.0/device/%s"
-var netticaVPNUpdateAPIFmt = "%s/api/v1.0/vpn/%s"
+// Nettica API URLs
+var (
+	netticaDeviceStatusAPIFmt = "%s/api/v1.0/device/%s/status"
+	netticaDeviceAPIFmt       = "%s/api/v1.0/device/%s"
+	netticaVPNUpdateAPIFmt    = "%s/api/v1.0/vpn/%s"
+)
 
 // Start the channel that iterates the nettica update function
 func StartChannel(c chan []byte) {
 
 	log.Infof("StartChannel Nettica Host %s", device.Server)
 	etag := ""
+	success := true
 	var err error
+	localIP, err := GetLocalIP()
+	if err != nil {
+		log.Errorf("Error getting local ip address: %v", err)
+	}
 
 	for {
 		content := <-c
@@ -39,18 +48,44 @@ func StartChannel(c chan []byte) {
 			break
 		}
 
+		ip, err := GetLocalIP()
+		if err != nil {
+			log.Errorf("Error getting local ip address: %v", err)
+		} else if ip != localIP {
+			NotifyInfo("Local IP address has changed.  Checking for updates...")
+			Bounce = true
+			localIP = ip
+		}
+
 		etag, err = GetNetticaVPN(etag)
 		if err != nil {
 			log.Errorf("Error getting nettica device: %v", err)
-			SuccessStatus = false
+			success = false
 		} else {
-			if !SuccessStatus {
-				SuccessStatus = true
+			if !success && !Bounce {
+				success = true
 				Bounce = true
 				NotifyInfo("Network change detected.  Checking for updates...")
 			}
 		}
 	}
+}
+
+// Get the current Source Address
+func GetLocalIP() (string, error) {
+
+	ip := ""
+
+	conn, err := net.Dial("udp", "8.8.8.8:53")
+	if err != nil {
+		log.Error("Impossible to get local ip address")
+	} else {
+		defer conn.Close()
+		localAddr := conn.LocalAddr().(*net.UDPAddr)
+		ip = localAddr.IP.String()
+	}
+
+	return ip, err
 }
 
 func DiscoverDevice(device *model.Device) {
