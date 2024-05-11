@@ -20,7 +20,10 @@ import (
 
 // Global variable for status changes
 var (
-	Bounce = false
+	Bounce          = false
+	FailSafe        = false
+	FailSafeMsgSent = false
+	Count           = 0
 )
 
 // Nettica API URLs
@@ -61,10 +64,18 @@ func StartChannel(c chan []byte) {
 		if err != nil {
 			log.Errorf("Error getting nettica device: %v", err)
 			success = false
+			Count++
+			if Count > 3 {
+				FailSafe = true
+				log.Info("FailSafe mode enabled.")
+			}
 		} else {
 			if !success && !Bounce {
 				success = true
 				Bounce = true
+				FailSafe = false
+				FailSafeMsgSent = false
+				Count = 0
 				NotifyInfo("Network change detected.  Checking for updates...")
 			}
 		}
@@ -1061,6 +1072,18 @@ func UpdateNetticaConfig(body []byte) {
 						log.Errorf("Error writing file %s : %s", path+name+".conf", err)
 					}
 
+					// FailSafe
+					if FailSafe && vpn.Enable && vpn.Current.FailSafe {
+						log.Infof("FailSafe: %s failed.  Stopping service", name)
+						if err = StopWireguard(name); err != nil {
+							log.Errorf("Error stopping wireguard: %v", err)
+						} else if !FailSafeMsgSent {
+							log.Infof("Stopped %s", name)
+							msg := fmt.Sprintf("FailSafe: Network %s stopped", name)
+							NotifyInfo(msg)
+						}
+					}
+
 					if !vpn.Enable {
 						// Host was disabled when we stopped wireguard above
 						log.Infof("Net %s is disabled.  Stopped service if running.", name)
@@ -1097,6 +1120,9 @@ func UpdateNetticaConfig(body []byte) {
 
 			}
 		}
+	}
+	if FailSafe {
+		FailSafeMsgSent = true
 	}
 
 }
