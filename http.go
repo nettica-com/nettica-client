@@ -138,18 +138,20 @@ func ServiceHandler(w http.ResponseWriter, req *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		log.Infof("StopWireguard(%s)", net)
-		log.Infof("Method: %s", req.Method)
-		err = StopWireguard(net)
-		if err != nil {
-			log.Error(err)
-		}
+
 		if vpn != nil {
 			vpn.Enable = false
 			err = UpdateVPN(vpn)
 			if err != nil {
 				log.Error(err)
 			}
+		}
+
+		log.Infof("StopWireguard(%s)", net)
+		log.Infof("Method: %s", req.Method)
+		err = StopWireguard(net)
+		if err != nil {
+			log.Error(err)
 		}
 		msg := fmt.Sprintf("Stopped network %s", net)
 		NotifyInfo(msg)
@@ -232,12 +234,26 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	case "GET":
 		log.Infof("Method: %s configHandler", req.Method)
 		Server := req.URL.Query().Get("server")
+		if Server == "undefined" {
+			Server = ""
+		}
 		DeviceID := req.URL.Query().Get("id")
+		if DeviceID == "undefined" {
+			DeviceID = ""
+		}
 		ApiKey := req.URL.Query().Get("apiKey")
-		if Server != "" && DeviceID != "" && ApiKey != "" {
+		if ApiKey == "undefined" {
+			ApiKey = ""
+		}
+		EZCode := req.URL.Query().Get("ezcode")
+		if EZCode == "undefined" {
+			EZCode = ""
+		}
+		if strings.HasPrefix(EZCode, "ez-") || (Server != "" && DeviceID != "" && ApiKey != "") {
 			device.Server = Server
 			device.Id = DeviceID
 			device.ApiKey = ApiKey
+			device.EZCode = EZCode
 
 			CheckInterval, _ := strconv.ParseInt(req.URL.Query().Get("checkInterval"), 10, 0)
 			if CheckInterval != 0 {
@@ -250,7 +266,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 			}
 
 			accountid := req.URL.Query().Get("accountid")
-			if accountid != "" {
+			if accountid != "" && accountid != "undefined" {
 				device.AccountID = accountid
 			}
 
@@ -285,13 +301,8 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 			}
 
 			instanceid := req.URL.Query().Get("instanceid")
-			if instanceid != "" {
+			if instanceid != "" && instanceid != "undefined" {
 				device.InstanceID = instanceid
-			}
-
-			ezcode := req.URL.Query().Get("ezcode")
-			if ezcode != "" && strings.HasPrefix(ezcode, "ez-") {
-				device.EZCode = ezcode
 			}
 
 			saveConfig()

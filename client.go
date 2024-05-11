@@ -492,6 +492,10 @@ func CompareDevices(d1 *model.Device, d2 *model.Device) bool {
 		return false
 	}
 
+	if d1.EZCode != d2.EZCode {
+		return false
+	}
+
 	if d1.Name != d2.Name {
 		return false
 	}
@@ -647,6 +651,14 @@ func MergeDevices(d1 *model.Device, d2 *model.Device) {
 
 	if d1.ServiceApiKey != "" {
 		d2.ServiceApiKey = d1.ServiceApiKey
+	}
+
+	if d1.InstanceID != "" {
+		d2.InstanceID = d1.InstanceID
+	}
+
+	if d1.EZCode != "" {
+		d2.EZCode = d1.EZCode
 	}
 
 }
@@ -885,7 +897,7 @@ func UpdateNetticaConfig(body []byte) {
 			log.Infof("Old config: %v", string(conf))
 		}
 
-		log.Debugf("%v", msg)
+		log.Debugf("Server Msg: %v", msg)
 
 		// See if the device is enabled.  If its not, stop all networks and return
 		if (msg.Device != nil) && !msg.Device.Enable {
