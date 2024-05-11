@@ -225,8 +225,12 @@ func CallNettica(etag *string) ([]byte, error) {
 
 	server := device.Server
 
-	if !device.Registered && device.InstanceID != "" {
-		device.Id = "device-id-" + device.InstanceID
+	if !device.Registered && (device.InstanceID != "" || device.EZCode != "") {
+		if strings.HasPrefix(device.EZCode, "ez-") {
+			device.Id = device.EZCode
+		} else {
+			device.Id = "device-id-" + device.InstanceID
+		}
 		if device.Server == "" {
 			device.Server = "https://my.nettica.com"
 		}

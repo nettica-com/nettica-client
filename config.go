@@ -90,6 +90,8 @@ func loadConfig() error {
 		device.ServiceGroup = os.Getenv("NETTICA_SERVICE_GROUP")
 		device.ServiceApiKey = os.Getenv("NETTICA_SERVICE_API_KEY")
 		device.InstanceID = os.Getenv("NETTICA_INSTANCE_ID")
+		device.EZCode = os.Getenv("NETTICA_EZCODE")
+
 		if os.Getenv("NETTICA_UPDATE_KEYS") == "false" {
 			device.UpdateKeys = false
 		}

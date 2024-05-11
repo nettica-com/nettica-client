@@ -289,6 +289,11 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 				device.InstanceID = instanceid
 			}
 
+			ezcode := req.URL.Query().Get("ezcode")
+			if ezcode != "" && strings.HasPrefix(ezcode, "ez-") {
+				device.EZCode = ezcode
+			}
+
 			saveConfig()
 			UpdateNetticaDevice(device)
 
