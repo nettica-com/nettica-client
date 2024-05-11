@@ -824,7 +824,7 @@ func UpdateNetticaConfig(body []byte) {
 	}
 
 	// compare the body to the current config and make no changes if they are the same
-	if bytes.Equal(conf, body) && !Bounce {
+	if bytes.Equal(conf, body) && !Bounce && !FailSafe {
 		return
 	} else {
 		log.Info("Config has changed, updating nettica.json")
