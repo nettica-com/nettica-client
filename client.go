@@ -68,18 +68,43 @@ func StartChannel(c chan []byte) {
 			if Count > 3 {
 				FailSafe = true
 				log.Info("FailSafe mode enabled.")
+				Failsafe()
 			}
 		} else {
 			if !success && !Bounce {
 				success = true
 				Bounce = true
-				FailSafe = false
-				FailSafeMsgSent = false
-				Count = 0
 				NotifyInfo("Network change detected.  Checking for updates...")
+			} else {
+				if FailSafe {
+					NotifyInfo("FailSafe has recovered connectivity")
+					FailSafe = false
+					FailSafeMsgSent = false
+					Count = 0
+				}
 			}
 		}
 	}
+}
+
+func Failsafe() error {
+
+	file, err := os.Open(GetDataPath() + "nettica.json")
+
+	if err != nil {
+		log.Errorf("Error opening nettica.json file %v", err)
+		return err
+	}
+	conf, err := io.ReadAll(file)
+	file.Close()
+	if err != nil {
+		log.Errorf("Error reading nettica config file: %v", err)
+		return err
+	}
+
+	UpdateNetticaConfig(conf)
+
+	return err
 }
 
 // Get the current Source Address
@@ -1047,6 +1072,20 @@ func UpdateNetticaConfig(body []byte) {
 					}
 				}
 
+				// FailSafe
+				if FailSafe && vpn.Current.FailSafe {
+					if !FailSafeMsgSent {
+						log.Infof("FailSafe: %s failed.  Stopping service", name)
+					}
+					if err = StopWireguard(name); err != nil {
+						log.Errorf("Error stopping wireguard: %v", err)
+					} else if !FailSafeMsgSent {
+						log.Infof("Stopped %s", name)
+						msg := fmt.Sprintf("FailSafe: Network %s stopped", name)
+						NotifyInfo(msg)
+					}
+				}
+
 				if !force && bytes.Equal(bits, text) {
 					log.Infof("*** SKIPPING %s *** No changes!", name)
 				} else {
@@ -1070,18 +1109,6 @@ func UpdateNetticaConfig(body []byte) {
 					err = os.WriteFile(path+name+".conf", text, 0600)
 					if err != nil {
 						log.Errorf("Error writing file %s : %s", path+name+".conf", err)
-					}
-
-					// FailSafe
-					if FailSafe && vpn.Enable && vpn.Current.FailSafe {
-						log.Infof("FailSafe: %s failed.  Stopping service", name)
-						if err = StopWireguard(name); err != nil {
-							log.Errorf("Error stopping wireguard: %v", err)
-						} else if !FailSafeMsgSent {
-							log.Infof("Stopped %s", name)
-							msg := fmt.Sprintf("FailSafe: Network %s stopped", name)
-							NotifyInfo(msg)
-						}
 					}
 
 					if !vpn.Enable {
