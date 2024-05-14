@@ -79,7 +79,6 @@ func loadConfig() error {
 		device.SourceAddress = "0.0.0.0"
 		device.OS = runtime.GOOS
 		device.Architecture = runtime.GOARCH
-		device.Version = Version
 		device.Enable = true
 		device.UpdateKeys = true
 
@@ -128,6 +127,8 @@ func loadConfig() error {
 			if err != nil {
 				return err
 			}
+			// Override the config file with the current version
+			device.Version = Version
 		}
 
 		if *quiet {
@@ -183,6 +184,7 @@ func loadConfig() error {
 		if err != nil {
 			return err
 		}
+		device.Version = Version
 
 		log.Infof("Server:   %s", device.Server)
 		log.Infof("DeviceID: %s", device.Id)
