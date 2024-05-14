@@ -576,14 +576,16 @@ func CompareDevices(d1 *model.Device, d2 *model.Device) bool {
 }
 
 // function merges two devices, d1 is the source, d2 is the destination
+// use this function to merge messages from the server back to the client.
 func MergeDevices(d1 *model.Device, d2 *model.Device) {
 
 	if (d1 == nil) || (d2 == nil) {
 		return
 	}
 
-	// Some properties, like Quiet and Debug, cannot be controlled by the server
+	// Some properties, like Quiet and Debug cannot be controlled by the server
 	// InstanceID is not managed by the server
+	// Version is not managed by the server
 
 	if d1.Id != d2.Id {
 		d2.Id = d1.Id
