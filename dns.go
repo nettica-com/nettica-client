@@ -17,21 +17,53 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type DNS struct {
+	ServerTable   map[string]string
+	DnsTable      map[string][]string
+	Resolvers     []string
+	DnsServers    map[string]*dns.Server
+	SearchDomains []string
+	Host          model.VPN
+}
+
 var (
-	ServerTable  map[string]string
-	ServerLock   sync.Mutex
-	DnsTable     map[string][]string
-	DnsLock      sync.Mutex
-	Resolvers    []string
-	ResolverLock sync.Mutex
-	DnsServers   map[string]*dns.Server
+	global     DNS
+	globalLock sync.Mutex
 )
 
-func StartDNS() error {
-	ServerTable = make(map[string]string)
-	DnsTable = make(map[string][]string)
-	DnsServers = make(map[string]*dns.Server)
+var blackhole = []string{
+	"168.192.in-addr.arpa",
+	"10.in-addr.arpa",
+	"16.172.in-addr.arpa",
+	"17.172.in-addr.arpa",
+	"18.172.in-addr.arpa",
+	"19.172.in-addr.arpa",
+	"20.172.in-addr.arpa",
+	"21.172.in-addr.arpa",
+	"22.172.in-addr.arpa",
+	"23.172.in-addr.arpa",
+	"24.172.in-addr.arpa",
+	"25.172.in-addr.arpa",
+	"26.172.in-addr.arpa",
+	"27.172.in-addr.arpa",
+	"28.172.in-addr.arpa",
+	"29.172.in-addr.arpa",
+	"30.172.in-addr.arpa",
+	"31.172.in-addr.arpa",
+	"254.169.in-addr.arpa",
+	"2.0.192.in-addr.arpa",
+	"100.51.198.in-addr.arpa",
+	"113.0.203.in-addr.arpa",
+	"0.8.e.f.ip6.arpa",
+	"c.f.ip6.arpa",
+	"d.f.ip6.arpa",
+	"8.e.f.ip6.arpa",
+	"9.e.f.ip6.arpa",
+	"a.e.f.ip6.arpa",
+	"b.e.f.ip6.arpa",
+}
 
+func StartDNS() error {
 	dns.HandleFunc(".", handleQueries)
 
 	InitializeDNS()
@@ -60,127 +92,57 @@ func StartDNS() error {
 		return err
 	}
 
-	ServerLock.Lock()
-	defer ServerLock.Unlock()
+	d, err := ParseMessage(msg)
+	if err != nil {
+		log.Errorf("Error parsing message: %v", err)
+		return err
+	}
 
-	DnsLock.Lock()
-	defer DnsLock.Unlock()
+	globalLock.Lock()
+	defer globalLock.Unlock()
 
-	ResolverLock.Lock()
-	defer ResolverLock.Unlock()
-
-	// get the DNS servers from the config file
-
-	for i := 0; i < len(msg.Config); i++ {
-		index := -1
-		for j := 0; j < len(msg.Config[i].VPNs); j++ {
-			if msg.Config[i].VPNs[j].DeviceID == device.Id {
-				index = j
+	// loop through the dns server and stop them if they are not in the new list
+	for address, server := range global.DnsServers {
+		found := false
+		for a := range d.DnsServers {
+			if a == address {
+				found = true
+				d.DnsServers[a] = server
 				break
 			}
 		}
-		if index == -1 {
-			log.Errorf("Error reading message %v", msg)
-		} else {
-			if msg.Config[i].VPNs[index].Enable && msg.Config[i].VPNs[index].Current.EnableDns {
-				host := msg.Config[i].VPNs[index]
-				name := strings.ToLower(host.Name)
-				log.Infof("label = %s addr = %v", name, host.Current.Address)
-				DnsTable[name] = append(DnsTable[name], host.Current.Address...)
-				if strings.Contains(host.Current.Address[0], ":") {
-					// ipv6
-				} else {
-					// ipv4
-					addresses := strings.Split(host.Current.Address[0], "/")
-					address := addresses[0]
-					digits := strings.Split(address, ".")
-					label := fmt.Sprintf("%s.%s.%s.%s.in-addr.arpa", digits[3], digits[2], digits[1], digits[0])
-					DnsTable[label] = []string{name}
-					log.Infof("label = %s name = %s", label, name)
-				}
-				msg.Config[i].VPNs = append(msg.Config[i].VPNs[:index], msg.Config[i].VPNs[index+1:]...)
-				for j := 0; j < len(msg.Config[i].VPNs); j++ {
-					n := strings.ToLower(msg.Config[i].VPNs[j].Name)
-					if strings.Contains(msg.Config[i].VPNs[j].Current.Address[0], ":") {
-						// ipv6
+		if !found {
+			log.Infof("Stopping DNS Server: %s", address)
+			server.Shutdown()
+			delete(global.DnsServers, address)
+		}
+	}
 
-					} else {
-						// ipv4
-						addresses := strings.Split(msg.Config[i].VPNs[j].Current.Address[0], "/")
-						address := addresses[0]
-						digits := strings.Split(address, ".")
-						label := fmt.Sprintf("%s.%s.%s.%s.in-addr.arpa", digits[3], digits[2], digits[1], digits[0])
-						DnsTable[label] = []string{n}
-					}
-					log.Infof("label = %s name = %v", n, msg.Config[i].VPNs[j].Current.Address)
-					DnsTable[n] = append(DnsTable[n], msg.Config[i].VPNs[j].Current.Address...)
-					if msg.Config[i].VPNs[j].Current.Endpoint != "" {
-						ip_port := msg.Config[i].VPNs[j].Current.Endpoint
-						parts := strings.Split(ip_port, ":")
-						ip := parts[0]
-						ServerTable[ip] = ip
-					}
-				}
-				resolvers := host.Current.Dns
-				// remove the host address from the list of resolvers
-				for j := 0; j < len(resolvers); j++ {
-					parts := strings.Split(host.Current.Address[0], "/")
-					if len(parts) > 0 && resolvers[j] == parts[0] {
-						resolvers = append(resolvers[:j], resolvers[j+1:]...)
-						break
-					}
-				}
+	global = *d
 
-				Resolvers = append(Resolvers, resolvers...)
-
-				// Eliminate any duplicates in the Resolvers list
-				for i := 0; i < len(Resolvers); i++ {
-					for j := i + 1; j < len(Resolvers); j++ {
-						if Resolvers[i] == Resolvers[j] {
-							Resolvers = append(Resolvers[:j], Resolvers[j+1:]...)
-							j--
-						}
-					}
-				}
-
-				if len(host.Current.Address[0]) > 3 {
-					address := host.Current.Address[0][:len(host.Current.Address[0])-3] + ":53"
-					server, err := LaunchDNS(address)
-					if err != nil {
-						log.Errorf("Error starting DNS server: %v", err)
-					} else {
-						DnsServers[address] = server
-					}
-				}
+	// loop through the dns servers and start them
+	for address, server := range global.DnsServers {
+		if server == nil {
+			server, _ := LaunchDNS(address)
+			if server != nil {
+				global.DnsServers[address] = server
 			}
 		}
 	}
 
-	log.Infof("DNS Resolvers: %v", Resolvers)
+	log.Infof("DNS Resolvers: %v", d.Resolvers)
 
 	return nil
 }
 
-func StopDNS(address string) error {
+func ParseMessage(msg model.Message) (*DNS, error) {
 
-	log.Infof("******************** STOP DNS : %s ********************", address)
+	var d DNS
 
-	address += ":53"
-	server := DnsServers[address]
-	DnsServers[address] = nil
-
-	if server != nil {
-		server.Shutdown()
-	}
-
-	return nil
-}
-
-func UpdateDNS(msg model.Message) error {
-
-	serverTable := make(map[string]string)
-	dnsTable := make(map[string][]string)
-	resolvers := make([]string, 0)
+	d.ServerTable = make(map[string]string)
+	d.DnsTable = make(map[string][]string)
+	d.DnsServers = make(map[string]*dns.Server)
+	d.SearchDomains = make([]string, 0)
 
 	for i := 0; i < len(msg.Config); i++ {
 		index := -1
@@ -192,88 +154,202 @@ func UpdateDNS(msg model.Message) error {
 		}
 		if index == -1 {
 			log.Errorf("Error reading message for DNS update: %v", msg)
-			return errors.New("Error reading message")
+			return nil, errors.New("Error reading message")
 		} else {
-			if msg.Config[i].VPNs[index].Enable && msg.Config[i].VPNs[index].Current.EnableDns {
-				host := msg.Config[i].VPNs[index]
-				name := strings.ToLower(host.Name)
-				dnsTable[name] = append(dnsTable[name], host.Current.Address...)
-				if strings.Contains(host.Current.Address[0], ":") {
-					// ipv6
-				} else {
-					// ipv4
-					addresses := strings.Split(host.Current.Address[0], "/")
-					address := addresses[0]
-					digits := strings.Split(address, ".")
-					label := fmt.Sprintf("%s.%s.%s.%s.in-addr.arpa", digits[3], digits[2], digits[1], digits[0])
-					dnsTable[label] = []string{name}
-					log.Infof("label = %s name = %s", label, name)
 
-				}
-				dnsTable[name] = append(dnsTable[name], host.Current.Address...)
-				msg.Config[i].VPNs = append(msg.Config[i].VPNs[:index], msg.Config[i].VPNs[index+1:]...)
+			d.Host = msg.Config[i].VPNs[index]
+
+			if msg.Config[i].VPNs[index].Enable && msg.Config[i].VPNs[index].Current.EnableDns {
 				for j := 0; j < len(msg.Config[i].VPNs); j++ {
-					n := strings.ToLower(msg.Config[i].VPNs[j].Name)
-					if strings.Contains(msg.Config[i].VPNs[j].Current.Address[0], ":") {
-						// ipv6
+					name := strings.ToLower(msg.Config[i].VPNs[j].Name)
+					addresses := strings.Split(msg.Config[i].VPNs[j].Current.Address[0], "/")
+					address := addresses[0]
+					if strings.Contains(address, ":") {
+						label, err := formatIPv6PTR(address)
+						if err != nil {
+							log.Errorf("can't generate reverse DNS label for %s", address)
+						} else {
+							d.DnsTable[label] = []string{name}
+						}
 					} else {
 						// ipv4
-						addresses := strings.Split(msg.Config[i].VPNs[j].Current.Address[0], "/")
-						address := addresses[0]
 						digits := strings.Split(address, ".")
 						label := fmt.Sprintf("%s.%s.%s.%s.in-addr.arpa", digits[3], digits[2], digits[1], digits[0])
-						dnsTable[label] = []string{n}
+						d.DnsTable[label] = []string{name}
 					}
-					dnsTable[n] = append(dnsTable[n], msg.Config[i].VPNs[j].Current.Address...)
+					d.DnsTable[name] = append(d.DnsTable[name], msg.Config[i].VPNs[j].Current.Address...)
+
+					// add the server to the server table
 					if msg.Config[i].VPNs[j].Current.Endpoint != "" {
 						ip_port := msg.Config[i].VPNs[j].Current.Endpoint
 						parts := strings.Split(ip_port, ":")
-						ip := parts[0]
-						serverTable[ip] = ip
+						if len(parts) > 0 {
+							if len(parts[0]) == 2 {
+								// this is an ipv4 address
+								ip := parts[0]
+								d.ServerTable[ip] = ip
+							} else {
+								// this is an ipv6 address
+								parts = strings.Split(ip_port, "]")
+								if len(parts) > 0 {
+									ip := strings.Trim(parts[0], "[")
+									d.ServerTable[ip] = ip
+								}
+							}
+						}
 					}
 				}
-				resolver := host.Current.Dns
+
 				// remove the host address from the list of resolvers
+				resolver := d.Host.Current.Dns
 				for j := 0; j < len(resolver); j++ {
-					parts := strings.Split(host.Current.Address[0], "/")
+					parts := strings.Split(d.Host.Current.Address[0], "/")
 					if len(parts) > 0 && resolver[j] == parts[0] {
 						resolver = append(resolver[:j], resolver[j+1:]...)
 						break
 					}
 				}
 
-				resolvers = append(resolvers, resolver...)
+				d.Resolvers = append(d.Resolvers, resolver...)
+				d.Resolvers = removeDuplicates(d.Resolvers)
 
-				// Eliminate any duplicates in the resolvers list
-				for i := 0; i < len(resolvers); i++ {
-					for j := i + 1; j < len(resolvers); j++ {
-						if resolvers[i] == resolvers[j] {
-							resolvers = append(resolvers[:j], resolvers[j+1:]...)
-							j--
-						}
-					}
+				// Add the server address but no server
+				if len(d.Host.Current.Address[0]) > 3 {
+					address := d.Host.Current.Address[0][:len(d.Host.Current.Address[0])-3] + ":53"
+					d.DnsServers[address] = nil
 				}
+			}
 
-				address := host.Current.Address[0]
-				address = address[0:strings.Index(address, "/")] + ":53"
+			// add the search domains.  the network name is a search domain
+			d.SearchDomains = append(d.SearchDomains, strings.ToLower(d.Host.NetName))
 
-				server, _ := LaunchDNS(address)
-				DnsServers[address] = server
+			search := d.Host.Current.Dns
+			for j := 0; j < len(search); j++ {
+				ip := net.ParseIP(search[j])
+				// if it's not an ip address then it's a search domain
+				if ip == nil {
+					d.SearchDomains = append(d.SearchDomains, search[j])
+				}
+			}
+			d.SearchDomains = removeDuplicates(d.SearchDomains)
+
+			// remove any non-ip address from the resolvers
+			for j := 0; j < len(d.Resolvers); j++ {
+				ip := net.ParseIP(d.Resolvers[j])
+				if ip == nil {
+					d.Resolvers = append(d.Resolvers[:j], d.Resolvers[j+1:]...)
+					j--
+				}
 			}
 		}
 	}
-	DnsLock.Lock()
-	DnsTable = dnsTable
-	DnsLock.Unlock()
 
-	ServerLock.Lock()
-	ServerTable = serverTable
-	ServerLock.Unlock()
+	return &d, nil
+}
 
-	ResolverLock.Lock()
-	log.Infof("Update DNS Resolvers: %v", resolvers)
-	Resolvers = resolvers
-	ResolverLock.Unlock()
+func removeDuplicates(list []string) []string {
+	for i := 0; i < len(list); i++ {
+		for j := i + 1; j < len(list); j++ {
+			if list[i] == list[j] {
+				list = append(list[:j], list[j+1:]...)
+				j--
+			}
+		}
+	}
+	return list
+}
+
+func formatIPv6PTR(address string) (string, error) {
+
+	parts := strings.Split(address, ":")
+	if len(parts) != 8 {
+		log.Errorf("Can't generate reverse DNS label for %s", address)
+	} else {
+		for x := 0; x < 8; x++ {
+			parts[x] = strings.Trim(parts[x], "[]")
+			for len(parts[x]) < 4 {
+				parts[x] = "0" + parts[x]
+			}
+		}
+		label := fmt.Sprintf("%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.%s.ip6.arpa",
+			parts[7][3:4], parts[7][2:3], parts[7][1:2], parts[7][0:1],
+			parts[6][3:4], parts[6][2:3], parts[6][1:2], parts[6][0:1],
+			parts[5][3:4], parts[5][2:3], parts[5][1:2], parts[5][0:1],
+			parts[4][3:4], parts[4][2:3], parts[4][1:2], parts[4][0:1],
+			parts[3][3:4], parts[3][2:3], parts[3][1:2], parts[3][0:1],
+			parts[2][3:4], parts[2][2:3], parts[2][1:2], parts[2][0:1],
+			parts[1][3:4], parts[1][2:3], parts[1][1:2], parts[1][0:1],
+			parts[0][3:4], parts[0][2:3], parts[0][1:2], parts[0][0:1])
+
+		return label, nil
+	}
+	return "", errors.New("can't generate reverse DNS label")
+}
+
+func StopDNS(address string) error {
+
+	log.Infof("******************** STOP DNS : %s ********************", address)
+
+	globalLock.Lock()
+	defer globalLock.Unlock()
+
+	address += ":53"
+	server := global.DnsServers[address]
+
+	// remove the server from the list of servers
+	delete(global.DnsServers, address)
+
+	if server != nil {
+		server.Shutdown()
+	}
+
+	return nil
+}
+
+func UpdateDNS(msg model.Message) error {
+	log.Infof("******************** UPDATE DNS ********************")
+	result, err := ParseMessage(msg)
+	if err != nil {
+		return err
+	}
+
+	globalLock.Lock()
+	defer globalLock.Unlock()
+
+	// loop through the dns server and stop them if they are not in the new list
+	for address, server := range global.DnsServers {
+		found := false
+		for a := range result.DnsServers {
+			if a == address {
+				found = true
+				result.DnsServers[a] = server
+				break
+			}
+		}
+		if !found {
+			log.Infof("Stopping DNS Server: %s", address)
+			server.Shutdown()
+			delete(global.DnsServers, address)
+		}
+	}
+
+	global = *result
+
+	// loop through the dns servers and start any that need it
+	for address, server := range global.DnsServers {
+		if server == nil {
+			log.Infof(" ************************************* Starting DNS Server: %s *************************************", address)
+			server, err := LaunchDNS(address)
+			if err != nil {
+				log.Errorf("Error starting DNS Server: %v", err)
+			}
+			if server != nil {
+				global.DnsServers[address] = server
+			}
+		}
+	}
+
+	log.Infof("DNS Resolvers: %v", global.Resolvers)
 
 	return nil
 }
@@ -290,9 +366,9 @@ func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 
 	switch r.Question[0].Qtype {
 
-	case dns.TypeA, dns.TypeAAAA:
+	case dns.TypeA, dns.TypeAAAA, dns.TypePTR:
 
-		addrs := DnsTable[q]
+		addrs := global.DnsTable[q]
 		if addrs != nil {
 			log.Infof("--- Query from DnsTable: %s", q)
 			m := new(dns.Msg)
@@ -351,6 +427,7 @@ func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 			go LogMessage(q)
 			return
 		} else {
+
 			QueryDNS(w, r)
 			return
 		}
@@ -361,28 +438,139 @@ func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 }
 
 // Make a recursive query
-func QueryDNS(w dns.ResponseWriter, r *dns.Msg) {
-	go LogMessage(r.Question[0].Name)
+func QueryDNS(w dns.ResponseWriter, query *dns.Msg) {
+
+	defer LogMessage(query.Question[0].Name)
+
 	c := new(dns.Client)
 	c.Net = "udp"
 	c.Timeout = 5000 * time.Millisecond
 
+	q := strings.ToLower(query.Question[0].Name)
+	q = strings.Trim(q, ".")
+
+	fBLockSearch := false
+	// Check for a search domain
+	for i := 0; i < len(global.SearchDomains); i++ {
+		if strings.HasSuffix(q, global.SearchDomains[i]) {
+
+			fBLockSearch = true
+			break
+		}
+	}
+
+	fBlackhole := false
+
+	// Check for and block blackhole domains
+	for i := 0; i < len(blackhole); i++ {
+		if strings.HasSuffix(q, blackhole[i]) {
+			fBlackhole = true
+			break
+		}
+	}
+
+	// Query internal resolvers before external resolvers
+	// x == 0 internal resolvers
+	// x == 1 external resolvers
+
+	for x := 0; x < 2; x++ {
+
+		for i := 0; i < len(global.Resolvers); i++ {
+
+			ip := net.ParseIP(global.Resolvers[i])
+			if ip == nil {
+				log.Errorf("Invalid IP address: %s", global.Resolvers[i])
+				continue
+			}
+
+			if !ip.IsPrivate() && !ip.IsLoopback() && (fBlackhole || fBLockSearch) {
+
+				log.Infof("Skipping %s", global.Resolvers[i])
+				continue
+			}
+
+			// Manage when to call internal and external resolvers
+			if x == 0 && !ip.IsPrivate() && !ip.IsLoopback() {
+				continue
+			}
+
+			if x == 1 && (ip.IsPrivate() || ip.IsLoopback()) {
+				continue
+			}
+
+			// Now make the query
+			var err error
+			response, err := MakeQuery(global.Resolvers[i]+":53", query)
+			if err == nil {
+
+				if response.Rcode == dns.RcodeSuccess {
+					w.WriteMsg(response)
+					return
+				}
+
+				log.Infof("--- Query to %s failed: %s %s", global.Resolvers[i], q, dns.RcodeToString[response.Rcode])
+
+			} else {
+				log.Errorf("*** Error:   %v", err)
+			}
+		}
+	}
+
+	if fBLockSearch {
+		log.Infof("--- Query to SearchDomains blocked: %s", q)
+		query.Authoritative = true
+		query.Rcode = dns.RcodeNameError
+		w.WriteMsg(query)
+		return
+	}
+	if fBlackhole {
+		log.Infof("--- Query to Blackhole blocked: %s", q)
+		query.Authoritative = true
+		query.Rcode = dns.RcodeNameError
+		w.WriteMsg(query)
+		return
+	}
+
+	query.Rcode = dns.RcodeServerFailure
+	w.WriteMsg(query)
+}
+
+func MakeQuery(resolver string, q *dns.Msg) (*dns.Msg, error) {
+	c := new(dns.Client)
+	c.Net = "udp"
+	c.Timeout = 1000 * time.Millisecond
+
+	log.Infof("*** Resolver: %s Query: %s", resolver, q.Question[0].Name)
+
 	// Measure the time it takes to get a response
 	start := time.Now()
 
-	for i := 0; i < len(Resolvers); i++ {
-		log.Infof("*** Resolver: %s Query: %s", Resolvers[i], r.Question[0].Name)
-		r, _, err := c.Exchange(r, Resolvers[i]+":53")
-		end := time.Now()
-		if err == nil {
-			took := end.Sub(start)
-			log.Infof("*** Response: (%v) %v", took, r)
-			w.WriteMsg(r)
-			return
-		} else {
-			log.Errorf("*** Error:   %v", err)
-		}
+	r, _, err := c.Exchange(q, resolver)
+	if err != nil {
+		return nil, err
 	}
+
+	end := time.Now()
+	took := end.Sub(start)
+
+	if !device.Quiet {
+		s := fmt.Sprintf("**** Response: %s (%v)   %s   %s   %s   ", resolver, took, dns.RcodeToString[r.Rcode], q.Question[0].Name, dns.Type(r.Question[0].Qtype).String())
+		if r.Rcode == dns.RcodeSuccess && len(r.Answer) > 0 {
+			s += fmt.Sprintf("%s   ", dns.Type(r.Answer[0].Header().Rrtype))
+			if r.Answer[0].Header().Rrtype == dns.TypeA {
+				s += r.Answer[0].(*dns.A).A.String()
+			} else if r.Answer[0].Header().Rrtype == dns.TypeAAAA {
+				s += r.Answer[0].(*dns.AAAA).AAAA.String()
+			} else if r.Answer[0].Header().Rrtype == dns.TypePTR {
+				s += r.Answer[0].(*dns.PTR).Ptr
+			} else if r.Answer[0].Header().Rrtype == dns.TypeCNAME {
+				s += r.Answer[0].(*dns.CNAME).Target
+			}
+		}
+		log.Infof(s)
+	}
+
+	return r, nil
 }
 
 // This sends a multicast message with the DNS query to anyone listening

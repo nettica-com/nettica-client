@@ -83,9 +83,11 @@ func StartWireguard(netName string) error {
 	cmd.Stderr = &out
 	err := cmd.Run()
 	if err != nil {
-		log.Errorf("Error starting WireGuard: %v (%s)", err, out.String())
+		log.Errorf("Error starting WireGuard: %s %v (%s)", netName, err, out.String())
 		return err
 	}
+
+	FlushDNS()
 
 	return err
 
@@ -102,7 +104,11 @@ func StopWireguard(netName string) error {
 	cmd.Stderr = &out
 	err := cmd.Run()
 	if err != nil {
-		log.Errorf("Error stopping WireGuard: %v (%s)", err, out.String())
+		log.Errorf("Error stopping WireGuard: %s %v (%s)", netName, err, out.String())
+	}
+
+	if err == nil {
+		FlushDNS()
 	}
 
 	// remove the file if it exists
@@ -251,8 +257,19 @@ func LaunchDNS(address string) (*dns.Server, error) {
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
 			log.Warnf("Failed to setup the DNS server on %s: %s\n", address, err.Error())
+			StopDNS(address)
 		}
 	}()
 
 	return server, nil
+}
+
+func FlushDNS() error {
+	log.Info("==================== Flushing DNS ====================")
+	cmd := exec.Command("systemctl", "restart", "systemd-resolved")
+	err := cmd.Run()
+	if err != nil {
+		log.Errorf("Error flushing DNS: %v", err)
+	}
+	return err
 }

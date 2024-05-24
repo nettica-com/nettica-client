@@ -131,6 +131,8 @@ func ServiceHandler(w http.ResponseWriter, req *http.Request) {
 
 	switch req.Method {
 	case "DELETE":
+		log.Infof("Method: %s", req.Method)
+
 		vpn, err := FindVPN(net)
 		if err != nil {
 			log.Error(err)
@@ -139,20 +141,33 @@ func ServiceHandler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
+		var errvpn error
 		if vpn != nil {
 			vpn.Enable = false
-			err = UpdateVPN(vpn)
-			if err != nil {
-				log.Error(err)
+			errvpn = UpdateVPN(vpn)
+			if errvpn != nil {
+				log.Error(errvpn)
+			} else {
+				log.Infof("Update successful.  VPN %s is disabled", net)
 			}
 		}
 
 		log.Infof("StopWireguard(%s)", net)
-		log.Infof("Method: %s", req.Method)
 		err = StopWireguard(net)
 		if err != nil {
 			log.Error(err)
 		}
+
+		if vpn != nil && errvpn != nil {
+			vpn.Enable = false
+			err = UpdateVPN(vpn)
+			if err != nil {
+				log.Error(err)
+			} else {
+				log.Infof("Update successful.  VPN %s is disabled", net)
+			}
+		}
+
 		msg := fmt.Sprintf("Stopped network %s", net)
 		NotifyInfo(msg)
 		log.Info(msg)

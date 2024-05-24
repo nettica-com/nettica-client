@@ -22,6 +22,7 @@ import (
 var (
 	Bounce          = false
 	FailSafe        = false
+	FailSafeActed   = false
 	FailSafeMsgSent = false
 	Count           = 0
 )
@@ -77,8 +78,11 @@ func StartChannel(c chan []byte) {
 				NotifyInfo("Network change detected.  Checking for updates...")
 			} else {
 				if FailSafe {
-					NotifyInfo("FailSafe has recovered connectivity")
+					if FailSafeActed {
+						NotifyInfo("FailSafe has recovered connectivity")
+					}
 					FailSafe = false
+					FailSafeActed = false
 					FailSafeMsgSent = false
 					Count = 0
 				}
@@ -769,7 +773,7 @@ func GetNetticaVPN(etag string) (string, error) {
 
 func UpdateVPN(vpn *model.VPN) error {
 
-	log.Infof("UPDATING VPN: %v", vpn)
+	log.Infof(" ******************** UPDATING VPN: %s ********************", vpn.Name)
 	server := device.Server
 	var client *http.Client
 
@@ -954,10 +958,6 @@ func UpdateNetticaConfig(body []byte) {
 		// make a copy of the message since UpdateDNS will alter it.
 		var msg2 model.Message
 		json.Unmarshal(body, &msg2)
-		err = UpdateDNS(msg2)
-		if err != nil {
-			log.Errorf("Error updating DNS configuration: %v", err)
-		}
 
 		// Get our local subnets, called here to avoid duplication
 		subnets, err := GetLocalSubnets()
@@ -1092,15 +1092,34 @@ func UpdateNetticaConfig(body []byte) {
 
 				// FailSafe
 				if FailSafe && vpn.Current.FailSafe {
-					if !FailSafeMsgSent {
-						log.Infof("FailSafe: %s failed.  Stopping service", name)
-					}
-					if err = StopWireguard(name); err != nil {
-						log.Errorf("Error stopping wireguard: %v", err)
+					running, err := IsWireguardRunning(name)
+					if err != nil {
+						log.Errorf("Error checking wireguard: %v", err)
+					} else if running {
+						if !FailSafeMsgSent {
+							log.Infof("FailSafe: %s failed.  Stopping service", name)
+							msg := fmt.Sprintf("FailSafe: Network %s failed.  Stopping service", name)
+							NotifyInfo(msg)
+						}
+						FailSafeActed = true
+
+						// Stop WireGuard and the DNS if it is running
+
+						if err = StopWireguard(name); err != nil {
+							log.Errorf("Error stopping wireguard: %v", err)
+						}
+
+						if vpn.Current.EnableDns {
+							StopDNS(vpn.Current.Address[0][0:strings.Index(vpn.Current.Address[0], "/")])
+						}
+
+						vpn.Enable = false
+
+						if err = UpdateVPN(&vpn); err != nil {
+							log.Errorf("Error updating VPN: %v", err)
+						}
 					} else if !FailSafeMsgSent {
 						log.Infof("Stopped %s", name)
-						msg := fmt.Sprintf("FailSafe: Network %s stopped", name)
-						NotifyInfo(msg)
 					}
 				}
 
@@ -1165,7 +1184,13 @@ func UpdateNetticaConfig(body []byte) {
 
 			}
 		}
+		err = UpdateDNS(msg2)
+		if err != nil {
+			log.Errorf("Error updating DNS configuration: %v", err)
+		}
+
 	}
+
 	if FailSafe {
 		FailSafeMsgSent = true
 	}
@@ -1356,26 +1381,37 @@ func StartBackgroundRefreshService() {
 					log.Errorf("Error writing file %s : %s", path+msg.Config[i].NetName+".conf", err)
 				}
 
+				running, err := IsWireguardRunning(msg.Config[i].NetName)
+				if err != nil {
+					log.Errorf("Error checking if wireguard is running: %v", err)
+				}
+
 				if !vpn.Enable {
-					StopWireguard(msg.Config[i].NetName)
-					log.Infof("Net %s is disabled.  Stopped service if running.", msg.Config[i].NetName)
+					if running || err != nil {
+						log.Infof("Net %s is disabled.  Stopped service...", msg.Config[i].NetName)
+						StopWireguard(msg.Config[i].NetName)
+					}
 				} else {
-					err = StartWireguard(msg.Config[i].NetName)
-					if err == nil {
-						log.Infof("Started %s", msg.Config[i].NetName)
-						log.Infof("%s Config: %v", msg.Config[i].NetName, msg.Config[i])
-					} else {
-						err = InstallWireguard(msg.Config[i].NetName)
-						if err != nil {
-							log.Errorf("Error installing wireguard: %v", err)
+					if !running || err != nil {
+						err = StartWireguard(msg.Config[i].NetName)
+						if err == nil {
+							log.Infof("Started %s", msg.Config[i].NetName)
+							log.Infof("%s Config: %v", msg.Config[i].NetName, msg.Config[i])
+						} else {
+							err = InstallWireguard(msg.Config[i].NetName)
+							if err != nil {
+								log.Errorf("Error installing wireguard: %v", err)
+							}
 						}
 					}
 
 				}
 
 			}
-			StartDNS()
 		}
+
+		StartDNS()
+
 		// Do this startup process every hour.  Keeps UPnP ports active, handles laptop sleeps, etc.
 		time.Sleep(60 * time.Minute)
 	}

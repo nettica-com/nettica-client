@@ -121,6 +121,8 @@ func InstallWireguard(netName string) error {
 		return err
 	}
 
+	StartWireguard(netName)
+
 	return nil
 
 }
@@ -176,13 +178,17 @@ func StartWireguard(netName string) error {
 	cmd.Stderr = &out
 	err := cmd.Start()
 	if err != nil {
-		log.Errorf("Error starting WireGuard: %v (%s)", err, out.String())
+		log.Errorf("Error starting WireGuard: %s %v (%s)", netName, err, out.String())
 	}
 	log.Info(out.String())
 
 	err = cmd.Wait()
 	if err != nil {
-		log.Errorf("Error starting WireGuard: %v (%s)", err, out.String())
+		log.Errorf("Error starting WireGuard: %s %v (%s)", netName, err, out.String())
+	}
+
+	if err == nil {
+		FlushDNS()
 	}
 
 	return err
@@ -207,13 +213,17 @@ func StopWireguard(netName string) error {
 	cmd.Stderr = &out
 	err := cmd.Start()
 	if err != nil {
-		log.Errorf("Error stopping WireGuard: %v (%s)", err, out.String())
+		log.Errorf("Error stopping WireGuard: %s %v (%s)", netName, err, out.String())
 	}
 	log.Info(out.String())
 
 	err = cmd.Wait()
 	if err != nil {
-		log.Errorf("Error stopping WireGuard: %v (%s)", err, out.String())
+		log.Errorf("Error stopping WireGuard: %s %v (%s)", netName, err, out.String())
+	}
+
+	if err == nil {
+		FlushDNS()
 	}
 
 	return err
@@ -326,8 +336,26 @@ func LaunchDNS(address string) (*dns.Server, error) {
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
 			log.Warnf("Failed to setup the DNS server on %s: %s\n", address, err.Error())
+			StopDNS(address)
 		}
 	}()
 
 	return server, nil
+}
+
+func FlushDNS() error {
+
+	log.Info("==================== Flushing DNS ====================")
+
+	args := []string{"/flushdns"}
+	cmd := exec.Command("ipconfig", args...)
+	var out bytes.Buffer
+	cmd.Stderr = &out
+	err := cmd.Run()
+	if err != nil {
+		log.Errorf("Error flushing DNS: %v (%s)", err, out.String())
+	}
+	log.Info(out.String())
+
+	return err
 }

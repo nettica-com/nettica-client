@@ -94,7 +94,7 @@ func StartWireguard(netName string) error {
 		cmd.Stderr = &out
 		err := cmd.Start()
 		if err != nil {
-			log.Errorf("Error starting WireGuard: %v (%s)", err, out.String())
+			log.Errorf("Error starting WireGuard:%s %v (%s)", netName, err, out.String())
 			return
 		}
 	}()
@@ -106,9 +106,11 @@ func StartWireguard(netName string) error {
 		cmd.Stderr = &out
 		err := cmd.Run()
 		if err != nil {
-			log.Errorf("Error reloading WireGuard: %v (%s)", err, out.String())
+			log.Errorf("Error starting WireGuard:%s %v (%s)", netName, err, out.String())
 			return
 		}
+
+		FlushDNS()
 
 	}()
 
@@ -126,13 +128,15 @@ func StopWireguard(netName string) error {
 	cmd.Stderr = &out
 	err := cmd.Run()
 	if err != nil {
-		log.Errorf("Error reloading WireGuard: %v (%s)", err, out.String())
+		log.Errorf("Error stopping WireGuard:%s %v (%s)", netName, err, out.String())
 	}
 	// remove the file if it exists
 	path := GetWireguardPath() + netName + ".conf"
 	if _, err := os.Stat(path); err == nil {
 		os.Remove(path)
 	}
+
+	FlushDNS()
 
 	return err
 
@@ -190,12 +194,16 @@ func RunService(svcName string) {
 func ServiceManager(svcName string, cmd string) {
 }
 
+var AppleServer *dns.Server
+
 func InitializeDNS() error {
 
 	go func() {
 		server := &dns.Server{Addr: "127.0.0.1:53", Net: "udp", TsigSecret: nil, ReusePort: true}
 		if err := server.ListenAndServe(); err != nil {
 			log.Warnf("UpdateDNS: Failed to setup the DNS server on %s: %s\n", "127.0.0.1:53", err.Error())
+		} else {
+			AppleServer = server
 		}
 
 	}()
@@ -203,7 +211,24 @@ func InitializeDNS() error {
 	return nil
 }
 
-func LaunchDNS(addr string) error {
+func LaunchDNS(addr string) (*dns.Server, error) {
+	return AppleServer, nil
+}
 
-	return nil
+func FlushDNS() {
+	log.Info("==================== Flushing DNS ====================")
+
+	go func() {
+
+		cmd := exec.Command("dscacheutil", "-flushcache")
+		err := cmd.Run()
+		if err != nil {
+			log.Errorf("Error flushing DNS: %v", err)
+		}
+		cmd = exec.Command("killall", "mDNSResponder")
+		err = cmd.Run()
+		if err != nil {
+			log.Errorf("Error flushing DNS: %v", err)
+		}
+	}()
 }
