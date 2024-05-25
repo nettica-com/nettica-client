@@ -255,6 +255,7 @@ func LaunchDNS(address string) (*dns.Server, error) {
 	server := &dns.Server{Addr: address, Net: "udp", TsigSecret: nil, ReusePort: true}
 	log.Infof("Starting DNS Server on %s", address)
 	go func() {
+		FlushDNS()
 		if err := server.ListenAndServe(); err != nil {
 			log.Warnf("Failed to setup the DNS server on %s: %s\n", address, err.Error())
 			StopDNS(address)

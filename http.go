@@ -133,7 +133,7 @@ func ServiceHandler(w http.ResponseWriter, req *http.Request) {
 	case "DELETE":
 		log.Infof("Method: %s", req.Method)
 
-		vpn, err := FindVPN(net)
+		vpn, _, err := FindVPN(net)
 		if err != nil {
 			log.Error(err)
 			// return an error
@@ -178,7 +178,7 @@ func ServiceHandler(w http.ResponseWriter, req *http.Request) {
 		log.Infof("StartWireguard(%s)", net)
 		log.Infof("Method: %s", req.Method)
 
-		vpn, err := FindVPN(net)
+		vpn, vpns, err := FindVPN(net)
 		if err != nil {
 			log.Error(err)
 			// return an error
@@ -186,6 +186,29 @@ func ServiceHandler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		if vpn != nil {
+			found := false
+			for _, v := range *vpns {
+				for _, a := range v.Current.AllowedIPs {
+					if a == "0.0.0.0/0" || a == "::/0" {
+						found = true
+						break
+					}
+				}
+				if found {
+					break
+				}
+			}
+
+			if found {
+				log.Infof("Stopping all other VPNs")
+				msg := fmt.Sprintf("Connecting to %s.  Stopping all other VPNs", net)
+				NotifyInfo(msg)
+				err = StopAllVPNs()
+				if err != nil {
+					log.Error(err)
+				}
+			}
+
 			vpn.Enable = true
 			err = UpdateVPN(vpn)
 			if err != nil {

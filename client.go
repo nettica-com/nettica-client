@@ -27,6 +27,11 @@ var (
 	Count           = 0
 )
 
+const (
+	NOFAILOVER = 0
+	FAILOVER   = 1
+)
+
 // Nettica API URLs
 var (
 	netticaDeviceStatusAPIFmt = "%s/api/v1.0/device/%s/status"
@@ -56,7 +61,8 @@ func StartChannel(c chan []byte) {
 		if err != nil {
 			log.Errorf("Error getting local ip address: %v", err)
 		} else if ip != localIP {
-			NotifyInfo("Local IP address has changed.  Checking for updates...")
+			msg := fmt.Sprintf("Local IP address has changed from %s to %s.  Checking for updates...", localIP, ip)
+			NotifyInfo(msg)
 			Bounce = true
 			localIP = ip
 		}
@@ -81,12 +87,13 @@ func StartChannel(c chan []byte) {
 					if FailSafeActed {
 						NotifyInfo("FailSafe has recovered connectivity")
 					}
-					FailSafe = false
-					FailSafeActed = false
-					FailSafeMsgSent = false
-					Count = 0
 				}
 			}
+			FailSafe = false
+			FailSafeActed = false
+			FailSafeMsgSent = false
+			Count = 0
+			Bounce = false
 		}
 	}
 }
@@ -266,14 +273,21 @@ func CallNettica(etag *string) ([]byte, error) {
 		}
 	}
 
+	answer, err := net.LookupIP("my.nettica.com")
+	if err != nil {
+		log.Errorf("DNS lookup for my.nettica.com failed: %v", err)
+	}
+
 	var reqURL string = fmt.Sprintf(netticaDeviceStatusAPIFmt, server, device.Id)
 	if !device.Quiet {
-		log.Infof("  GET %s", reqURL)
+		log.Infof("  GET %s (%s)", reqURL, answer[0].String())
 	}
 
 	// Create a context with a 15 second timeout
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(15*time.Second))
 	defer cancel()
+
+	// make a DNS lookup for my.nettica.com
 
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
 	if err != nil {
@@ -874,6 +888,14 @@ func UpdateNetticaConfig(body []byte) {
 	if bytes.Equal(conf, body) && !Bounce && !FailSafe {
 		return
 	} else {
+		if Bounce {
+			log.Info("BOUNCE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+		}
+
+		if FailSafe {
+			log.Info("FailSafe!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+		}
+
 		log.Info("Config has changed, updating nettica.json")
 
 		// if we can't read the message, immediately return
@@ -990,6 +1012,11 @@ func UpdateNetticaConfig(body []byte) {
 			}
 		}
 
+		// force a network bounce under certain conditions
+		// moved outside loop for reprocessing a network that
+		// might otherwise be missed
+		force := false
+
 		// handle any other changes
 		for i := 0; i < len(msg.Config); i++ {
 			index := -1
@@ -1074,7 +1101,6 @@ func UpdateNetticaConfig(body []byte) {
 				path := GetWireguardPath()
 				name := msg.Config[i].NetName
 
-				force := false
 				var bits []byte
 
 				file, err := os.Open(path + name + ".conf")
@@ -1091,51 +1117,104 @@ func UpdateNetticaConfig(body []byte) {
 				}
 
 				// FailSafe
-				if FailSafe && vpn.Current.FailSafe {
+				log.Infof("FailSafe: %v vpn.FailSafe %v Enable %v Failover %v", FailSafe, vpn.Current.FailSafe, vpn.Enable, vpn.Failover)
+				if FailSafe && vpn.Current.FailSafe && vpn.Enable && vpn.Failover == NOFAILOVER {
 					running, err := IsWireguardRunning(name)
 					if err != nil {
 						log.Errorf("Error checking wireguard: %v", err)
-					} else if running {
+					}
+
+					if running {
 						if !FailSafeMsgSent {
 							log.Infof("FailSafe: %s failed.  Stopping service", name)
 							msg := fmt.Sprintf("FailSafe: Network %s failed.  Stopping service", name)
 							NotifyInfo(msg)
 						}
-						FailSafeActed = true
 
-						// Stop WireGuard and the DNS if it is running
+						// Stop the DNS if is running
+						if vpn.Current.EnableDns {
+							address := vpn.Current.Address[0]
+							address = address[0:strings.Index(address, "/")]
+							StopDNS(address)
+							DropCache()
+						}
 
-						if err = StopWireguard(name); err != nil {
+						err = StopWireguard(name)
+						if err != nil {
 							log.Errorf("Error stopping wireguard: %v", err)
 						}
 
-						if vpn.Current.EnableDns {
-							StopDNS(vpn.Current.Address[0][0:strings.Index(vpn.Current.Address[0], "/")])
-						}
+						FailSafeActed = true
+						vpn.Failover = FAILOVER
 
-						vpn.Enable = false
-
+						// Update the server with any luck
 						if err = UpdateVPN(&vpn); err != nil {
 							log.Errorf("Error updating VPN: %v", err)
 						}
-					} else if !FailSafeMsgSent {
-						log.Infof("Stopped %s", name)
+					} else {
+						log.Infof("FailSafe: Starting network %s", name)
+						msg := fmt.Sprintf("FailSafe: Starting network %s", name)
+						NotifyInfo(msg)
+
+						err = StartWireguard(name)
+						if err != nil {
+							log.Errorf("Error starting wireguard: %v", err)
+						}
+
+						if (vpn.Current.EnableDns) && (err == nil) {
+							var msg3 model.Message
+							json.Unmarshal(body, &msg3)
+							err = UpdateDNS(msg3)
+							if err != nil {
+								log.Errorf("Error updating DNS configuration: %v", err)
+							} else {
+								vpn.Failover = NOFAILOVER
+
+								if err = UpdateVPN(&vpn); err != nil {
+									log.Errorf("Error updating VPN: %v", err)
+								}
+							}
+						}
+
+					}
+					log.Infof(" >>>>>>>>> Failover process has begun for %s", name)
+
+				}
+
+				// Handle recovery from FailSafe
+				if !FailSafe && vpn.Failover == FAILOVER {
+					vpn.Enable = true
+					vpn.Failover = NOFAILOVER
+					force = true
+					if err = UpdateVPN(&vpn); err != nil {
+						log.Errorf("Error updating VPN: %v", err)
+					}
+
+					if err == nil {
+						msg.Config[i].VPNs[index] = vpn
+						i-- // reprocess this network
+						continue
 					}
 				}
 
 				if !force && bytes.Equal(bits, text) {
 					log.Infof("*** SKIPPING %s *** No changes!", name)
 				} else {
-					err = StopWireguard(name)
-					if err != nil {
-						log.Errorf("Error stopping wireguard: %v", err)
-					}
+					// reinitialize force to false for future iterations
+					force = false
+
+					// The configuration has changed, so stop the service to perform the update
 
 					// Stop the DNS if is running
 					if vpn.Current.EnableDns {
 						address := vpn.Current.Address[0]
 						address = address[0:strings.Index(address, "/")]
 						StopDNS(address)
+					}
+
+					err = StopWireguard(name)
+					if err != nil {
+						log.Errorf("Error stopping wireguard: %v", err)
 					}
 
 					err = os.MkdirAll(path, 0600)
@@ -1197,26 +1276,26 @@ func UpdateNetticaConfig(body []byte) {
 
 }
 
-func FindVPN(net string) (*model.VPN, error) {
+func FindVPN(net string) (*model.VPN, *[]model.VPN, error) {
 
 	file, err := os.Open(GetDataPath() + "nettica.json")
 
 	if err != nil {
 		log.Errorf("Error opening nettica.json file %v", err)
-		return nil, err
+		return nil, nil, err
 	}
 	conf, err := io.ReadAll(file)
 	file.Close()
 	if err != nil {
 		log.Errorf("Error reading nettica config file: %v", err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	var msg model.Message
 	err = json.Unmarshal(conf, &msg)
 	if err != nil {
 		log.Errorf("Error reading message from config file")
-		return nil, err
+		return nil, nil, err
 	}
 
 	for i := 0; i < len(msg.Config); i++ {
@@ -1225,14 +1304,88 @@ func FindVPN(net string) (*model.VPN, error) {
 			for j := 0; j < len(msg.Config[i].VPNs); j++ {
 				if msg.Config[i].VPNs[j].DeviceID == device.Id {
 					log.Infof("Found VPN %v", msg.Config[i].VPNs[j])
-					return &msg.Config[i].VPNs[j], nil
+					return &msg.Config[i].VPNs[j], &msg.Config[i].VPNs, nil
 				}
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("VPN not found")
+	return nil, nil, fmt.Errorf("VPN not found")
 
+}
+
+func StopAllVPNs() error {
+
+	log.Infof(" ******************** STOPPING ALL VPNS ********************")
+
+	file, err := os.Open(GetDataPath() + "nettica.json")
+
+	if err != nil {
+		log.Errorf("Error opening nettica.json file %v", err)
+		return err
+	}
+	conf, err := io.ReadAll(file)
+	file.Close()
+	if err != nil {
+		log.Errorf("Error reading nettica config file: %v", err)
+		return err
+	}
+
+	var msg model.Message
+	err = json.Unmarshal(conf, &msg)
+	if err != nil {
+		log.Errorf("Error reading message from config file")
+		return err
+	}
+
+	for i := 0; i < len(msg.Config); i++ {
+		index := -1
+		for j := 0; j < len(msg.Config[i].VPNs); j++ {
+			if msg.Config[i].VPNs[j].DeviceID == device.Id {
+				index = j
+				break
+			}
+		}
+		if index == -1 {
+			log.Errorf("Error reading message %v", msg)
+			return err
+		}
+
+		vpn := msg.Config[i].VPNs[index]
+		if vpn.Enable {
+			log.Infof(" >>>>>>>>>> Stopping VPN %s", vpn.NetName)
+			vpn.Enable = false
+			err = UpdateVPN(&vpn)
+			if err != nil {
+				log.Errorf("Error disabling VPN %v", vpn)
+			}
+			err = StopWireguard(msg.Config[i].NetName)
+			if err != nil {
+				log.Errorf("Error stopping wireguard: %v", err)
+			}
+		}
+	}
+
+	// Marshal the message back to the file
+	body, err := json.Marshal(msg)
+	if err != nil {
+		log.Errorf("Error marshalling message: %v", err)
+		return err
+	}
+
+	file, err = os.OpenFile(GetDataPath()+"nettica.json", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+	if err != nil {
+		log.Errorf("Error opening nettica.json for write: %v", err)
+		return nil
+	}
+	_, err = file.Write(body)
+	file.Close()
+	if err != nil {
+		log.Infof("Error writing nettica.json file: %v", err)
+		return nil
+	}
+
+	return nil
 }
 
 func GetLocalSubnets() ([]*net.IPNet, error) {

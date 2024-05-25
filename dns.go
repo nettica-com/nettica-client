@@ -293,7 +293,9 @@ func StopDNS(address string) error {
 	globalLock.Lock()
 	defer globalLock.Unlock()
 
-	address += ":53"
+	if !strings.HasSuffix(address, ":53") {
+		address += ":53"
+	}
 	server := global.DnsServers[address]
 
 	// remove the server from the list of servers
@@ -306,8 +308,19 @@ func StopDNS(address string) error {
 	return nil
 }
 
+func DropCache() error {
+	log.Infof("******************** DROP DNS CACHE ********************")
+
+	globalLock.Lock()
+	defer globalLock.Unlock()
+
+	global.DnsTable = make(map[string][]string)
+
+	return nil
+}
+
 func UpdateDNS(msg model.Message) error {
-	log.Infof("******************** UPDATE DNS ********************")
+	log.Info("==================== UPDATE DNS ====================")
 	result, err := ParseMessage(msg)
 	if err != nil {
 		return err
@@ -323,6 +336,7 @@ func UpdateDNS(msg model.Message) error {
 			if a == address {
 				found = true
 				result.DnsServers[a] = server
+				log.Infof("Keeping DNS Server: %s", server.Addr)
 				break
 			}
 		}
