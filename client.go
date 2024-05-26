@@ -93,7 +93,6 @@ func StartChannel(c chan []byte) {
 			FailSafeActed = false
 			FailSafeMsgSent = false
 			Count = 0
-			Bounce = false
 		}
 	}
 }
@@ -280,7 +279,11 @@ func CallNettica(etag *string) ([]byte, error) {
 
 	var reqURL string = fmt.Sprintf(netticaDeviceStatusAPIFmt, server, device.Id)
 	if !device.Quiet {
-		log.Infof("  GET %s (%s)", reqURL, answer[0].String())
+		s := "NXDOMAIN"
+		if len(answer) > 0 {
+			s = answer[0].String()
+		}
+		log.Infof("  GET %s (%s)", reqURL, s)
 	}
 
 	// Create a context with a 15 second timeout
@@ -778,6 +781,13 @@ func GetNetticaVPN(etag string) (string, error) {
 			log.Error(err)
 		}
 	} else {
+		if FailSafe {
+			NotifyInfo("FailSafe: connectivity restored")
+			FailSafe = false
+			FailSafeActed = false
+			FailSafeMsgSent = false
+			Count = 0
+		}
 		UpdateNetticaConfig(body)
 		return etag, nil
 	}
@@ -1017,9 +1027,32 @@ func UpdateNetticaConfig(body []byte) {
 		// might otherwise be missed
 		force := false
 
+		//
 		// handle any other changes
+		//
+
+		// msg schema is:
+		// type Message struct {
+		// 	Device *Device `json:"device"`
+		// 	Config []Net   `json:"config"`
+		// }
+		// type Net struct {
+		// 	NetName string `json:"netname"`
+		// 	VPNs    []VPN  `json:"vpns"`
+		// }
+		// type VPN struct {
+		// 	DeviceID string   `json:"deviceid"`
+		// 	Name     string   `json:"name"`
+		// 	Current  Settings `json:"current"`
+		// 	Enable   bool     `json:"enable"`
+		// 	FailSafe bool     `json:"failsafe"`
+		// 	Failover int      `json:"failover"`
+		// }
+
+		// loop through the networks
 		for i := 0; i < len(msg.Config); i++ {
 			index := -1
+			// find our VPN in the configuration
 			for j := 0; j < len(msg.Config[i].VPNs); j++ {
 				if msg.Config[i].VPNs[j].DeviceID == device.Id {
 					index = j
@@ -1029,6 +1062,7 @@ func UpdateNetticaConfig(body []byte) {
 			if index == -1 {
 				log.Errorf("Error reading message %v", msg)
 			} else {
+				// physically pull out our VPN from the other configurations
 				vpn := msg.Config[i].VPNs[index]
 				msg.Config[i].VPNs = append(msg.Config[i].VPNs[:index], msg.Config[i].VPNs[index+1:]...)
 
@@ -1036,6 +1070,7 @@ func UpdateNetticaConfig(body []byte) {
 				go ConfigureUPnP(vpn)
 
 				// If any of the AllowedIPs contain our subnet, remove that entry
+				// This is to prevent routing loops and is very important
 				for k := 0; k < len(msg.Config[i].VPNs); k++ {
 					allowed := msg.Config[i].VPNs[k].Current.AllowedIPs
 					for l := 0; l < len(allowed); l++ {
@@ -1053,7 +1088,6 @@ func UpdateNetticaConfig(body []byte) {
 				}
 
 				// Check to see if we have the private key
-
 				key, found := KeyLookup(vpn.Current.PublicKey)
 				if !found {
 					KeyAdd(vpn.Current.PublicKey, vpn.Current.PrivateKey)
@@ -1092,6 +1126,7 @@ func UpdateNetticaConfig(body []byte) {
 					vpn.Current.PrivateKey = key
 				}
 
+				// Create a new NetName.conf configuration file
 				text, err := DumpWireguardConfig(&vpn, &(msg.Config[i].VPNs))
 				if err != nil {
 					log.Errorf("error on template: %s", err)
@@ -1116,18 +1151,25 @@ func UpdateNetticaConfig(body []byte) {
 					}
 				}
 
-				// FailSafe
-				log.Infof("FailSafe: %v vpn.FailSafe %v Enable %v Failover %v", FailSafe, vpn.Current.FailSafe, vpn.Enable, vpn.Failover)
-				if FailSafe && vpn.Current.FailSafe && vpn.Enable && vpn.Failover == NOFAILOVER {
+				// FailSafe processing
+				if FailSafe {
+					log.Infof("FailSafe: %v vpn.FailSafe %v Enable %v Failover %v", FailSafe, vpn.Current.FailSafe, vpn.Enable, vpn.Failover)
+				}
+
+				// If we're in FailSafe, and the VPN is configured for it, and the VPN is enabled...
+				if FailSafe && vpn.Current.FailSafe && vpn.Enable {
+					// Check to see if the VPN is running
 					running, err := IsWireguardRunning(name)
 					if err != nil {
 						log.Errorf("Error checking wireguard: %v", err)
 					}
 
+					// If the VPN is running, stop it, and the DNS if it's enabled
 					if running {
+
+						log.Infof("FailSafe: %s failed.  Stopping service", name)
 						if !FailSafeMsgSent {
-							log.Infof("FailSafe: %s failed.  Stopping service", name)
-							msg := fmt.Sprintf("FailSafe: Network %s failed.  Stopping service", name)
+							msg := fmt.Sprintf("FailSafe: Network %s failed. Stopping service", name)
 							NotifyInfo(msg)
 						}
 
@@ -1136,9 +1178,12 @@ func UpdateNetticaConfig(body []byte) {
 							address := vpn.Current.Address[0]
 							address = address[0:strings.Index(address, "/")]
 							StopDNS(address)
+							// Since the DNS has a shared cache, we need to dump the whole thing.
+							// On recovery we'll rebuild it.
 							DropCache()
 						}
 
+						// Stop WireGuard
 						err = StopWireguard(name)
 						if err != nil {
 							log.Errorf("Error stopping wireguard: %v", err)
@@ -1152,16 +1197,20 @@ func UpdateNetticaConfig(body []byte) {
 							log.Errorf("Error updating VPN: %v", err)
 						}
 					} else {
+
+						// If the VPN is not running, maybe it should be.  Start it.
 						log.Infof("FailSafe: Starting network %s", name)
-						msg := fmt.Sprintf("FailSafe: Starting network %s", name)
-						NotifyInfo(msg)
+						if !FailSafeMsgSent {
+							msg := fmt.Sprintf("FailSafe: Starting network %s", name)
+							NotifyInfo(msg)
+						}
 
 						err = StartWireguard(name)
 						if err != nil {
 							log.Errorf("Error starting wireguard: %v", err)
 						}
 
-						if (vpn.Current.EnableDns) && (err == nil) {
+						/*if (vpn.Current.EnableDns) && (err == nil) {
 							var msg3 model.Message
 							json.Unmarshal(body, &msg3)
 							err = UpdateDNS(msg3)
@@ -1174,28 +1223,32 @@ func UpdateNetticaConfig(body []byte) {
 									log.Errorf("Error updating VPN: %v", err)
 								}
 							}
+						}*/
+						FailSafeActed = true
+
+					}
+					log.Infof(" >>>>>>>>>> Failover processing for %s <<<<<<<<<<", name)
+
+					// Skip the rest of this processing because it's for normal operations
+					continue
+				}
+
+				/*
+					// Handle recovery from FailSafe
+					if !FailSafe && vpn.Failover == FAILOVER {
+						vpn.Enable = true
+						vpn.Failover = NOFAILOVER
+						force = true
+						if err = UpdateVPN(&vpn); err != nil {
+							log.Errorf("Error updating VPN: %v", err)
 						}
 
-					}
-					log.Infof(" >>>>>>>>> Failover process has begun for %s", name)
-
-				}
-
-				// Handle recovery from FailSafe
-				if !FailSafe && vpn.Failover == FAILOVER {
-					vpn.Enable = true
-					vpn.Failover = NOFAILOVER
-					force = true
-					if err = UpdateVPN(&vpn); err != nil {
-						log.Errorf("Error updating VPN: %v", err)
-					}
-
-					if err == nil {
-						msg.Config[i].VPNs[index] = vpn
-						i-- // reprocess this network
-						continue
-					}
-				}
+						if err == nil {
+							msg.Config[i].VPNs[index] = vpn
+							i-- // reprocess this network
+							continue
+						}
+					}*/
 
 				if !force && bytes.Equal(bits, text) {
 					log.Infof("*** SKIPPING %s *** No changes!", name)
@@ -1238,13 +1291,12 @@ func UpdateNetticaConfig(body []byte) {
 							msg := fmt.Sprintf("Network %s has been stopped", name)
 							NotifyInfo(msg)
 						}
-
 					} else {
 						// Start the existing service
 						err = StartWireguard(name)
 						if err == nil {
 							log.Infof("Started %s", name)
-							log.Infof("%s Config: %v", name, msg.Config[i])
+							// log.Infof("%s Config: %v", name, msg.Config[i])
 							msg := fmt.Sprintf("Network %s has been updated", name)
 							NotifyInfo(msg)
 						} else {
@@ -1260,14 +1312,14 @@ func UpdateNetticaConfig(body []byte) {
 						}
 					}
 				}
-
 			}
 		}
+		// After everything has been processed, update the DNS
+		// We do it here to avoid multiple updates
 		err = UpdateDNS(msg2)
 		if err != nil {
 			log.Errorf("Error updating DNS configuration: %v", err)
 		}
-
 	}
 
 	if FailSafe {
@@ -1352,18 +1404,22 @@ func StopAllVPNs() error {
 		}
 
 		vpn := msg.Config[i].VPNs[index]
-		if vpn.Enable {
-			log.Infof(" >>>>>>>>>> Stopping VPN %s", vpn.NetName)
-			vpn.Enable = false
-			err = UpdateVPN(&vpn)
-			if err != nil {
-				log.Errorf("Error disabling VPN %v", vpn)
+
+		// Stop them all asynchronously or some might get missed
+		go func(vpn model.VPN) {
+			if vpn.Enable {
+				log.Infof(" >>>>>>>>>> Stopping VPN %s <<<<<<<<<<", vpn.NetName)
+				vpn.Enable = false
+				err = UpdateVPN(&vpn)
+				if err != nil {
+					log.Errorf("Error disabling VPN %v", vpn.NetName)
+				}
+				err = StopWireguard(vpn.NetName)
+				if err != nil {
+					log.Errorf("Error stopping wireguard: %v", err)
+				}
 			}
-			err = StopWireguard(msg.Config[i].NetName)
-			if err != nil {
-				log.Errorf("Error stopping wireguard: %v", err)
-			}
-		}
+		}(vpn)
 	}
 
 	// Marshal the message back to the file

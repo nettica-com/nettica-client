@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/huin/goupnp v1.3.0
 	github.com/miekg/dns v1.1.59
-	github.com/nettica-com/nettica-admin v0.0.0-20240525072711-9b86095bda07
+	github.com/nettica-com/nettica-admin v0.0.0-20240525080257-a3264de3bccf
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/sys v0.20.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6

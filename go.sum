@@ -1063,6 +1063,8 @@ github.com/nettica-com/nettica-admin v0.0.0-20240511145343-73c374215c09 h1:ZArIg
 github.com/nettica-com/nettica-admin v0.0.0-20240511145343-73c374215c09/go.mod h1:fFnQvAKVdzbxC131E85rJVfAAGFzNqVYRwbt/yfpSAI=
 github.com/nettica-com/nettica-admin v0.0.0-20240525072711-9b86095bda07 h1:/1JARplO3xYA5kBBfRsPBjhP8ZLtCic16m3hVsIr9qU=
 github.com/nettica-com/nettica-admin v0.0.0-20240525072711-9b86095bda07/go.mod h1:fFnQvAKVdzbxC131E85rJVfAAGFzNqVYRwbt/yfpSAI=
+github.com/nettica-com/nettica-admin v0.0.0-20240525080257-a3264de3bccf h1:bMaL2XKQwbs/xhuBjmeLb+0iPaP8ar3UHFzqjsq1zsk=
+github.com/nettica-com/nettica-admin v0.0.0-20240525080257-a3264de3bccf/go.mod h1:fFnQvAKVdzbxC131E85rJVfAAGFzNqVYRwbt/yfpSAI=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/onsi/ginkgo v0.0.0-20170829012221-11459a886d9c/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
