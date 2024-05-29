@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -342,6 +343,8 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 			if instanceid != "" && instanceid != "undefined" {
 				device.InstanceID = instanceid
 			}
+
+			device.Updated = time.Now()
 
 			saveConfig()
 			UpdateNetticaDevice(device)

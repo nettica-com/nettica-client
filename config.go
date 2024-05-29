@@ -52,13 +52,17 @@ func reloadConfig() error {
 	if err != nil {
 		return err
 	}
-	json.Unmarshal(data, &device)
+	err = json.Unmarshal(data, &device)
+	if err != nil {
+		return err
+	}
 
-	log.Infof("Server:   %s", device.Server)
-	log.Infof("DeviceID: %s", device.Id)
-	log.Infof("ApiKey:   %s...", device.ApiKey[0:len(device.ApiKey)-len(device.ApiKey)/2])
-	log.Infof("CheckInterval:   %d", device.CheckInterval)
-	log.Infof("Quiet:    %t", device.Quiet)
+	log.Infof("Server:        %s", device.Server)
+	log.Infof("DeviceID:      %s", device.Id)
+	log.Infof("AccountID:     %s", device.AccountID)
+	log.Infof("ApiKey:        %s...", device.ApiKey[0:len(device.ApiKey)-len(device.ApiKey)/2])
+	log.Infof("CheckInterval: %d", device.CheckInterval)
+	log.Infof("Quiet:         %t", device.Quiet)
 
 	return nil
 }
@@ -169,10 +173,11 @@ func loadConfig() error {
 			return err
 		}
 		cfg.loaded = true
-		log.Infof("Server:   %s", device.Server)
-		log.Infof("DeviceID: %s", device.Id)
-		log.Infof("ApiKey:   %s...", device.ApiKey[0:len(device.ApiKey)-len(device.ApiKey)/2])
-		log.Infof("Quiet:    %t", device.Quiet)
+		log.Infof("Server:    %s", device.Server)
+		log.Infof("DeviceID:  %s", device.Id)
+		log.Infof("AccountID: %s", device.AccountID)
+		log.Infof("ApiKey:    %s...", device.ApiKey[0:len(device.ApiKey)-len(device.ApiKey)/2])
+		log.Infof("Quiet:     %t", device.Quiet)
 
 	} else {
 		file, err := os.Open(GetDataPath() + *cfg.path)
@@ -186,10 +191,11 @@ func loadConfig() error {
 		}
 		device.Version = Version
 
-		log.Infof("Server:   %s", device.Server)
-		log.Infof("DeviceID: %s", device.Id)
-		log.Infof("ApiKey:   %s...", device.ApiKey[0:len(device.ApiKey)-len(device.ApiKey)/2])
-		log.Infof("Quiet:    %t", device.Quiet)
+		log.Infof("Server:    %s", device.Server)
+		log.Infof("DeviceID:  %s", device.Id)
+		log.Infof("AccountID: %s", device.AccountID)
+		log.Infof("ApiKey:    %s...", device.ApiKey[0:len(device.ApiKey)-len(device.ApiKey)/2])
+		log.Infof("Quiet:     %t", device.Quiet)
 
 		cfg.loaded = true
 	}

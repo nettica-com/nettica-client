@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -680,15 +681,17 @@ func MergeDevices(d1 *model.Device, d2 *model.Device) {
 		d2.InstanceID = d1.InstanceID
 	}
 
-	if d1.EZCode != "" {
-		d2.EZCode = d1.EZCode
-	}
+	d2.EZCode = d1.EZCode
 
 }
 
 func UpdateNetticaDevice(d model.Device) error {
 
 	log.Infof("UPDATING DEVICE: %v", d)
+
+	if device.Server == "" || device.AccountID == "" || device.ApiKey == "" || device.Id == "" {
+		return errors.New("skipping update, not enough information.  waiting for server to update us")
+	}
 
 	server := device.Server
 	var client *http.Client
@@ -939,8 +942,9 @@ func UpdateNetticaConfig(body []byte) {
 
 		// See if the device is enabled.  If its not, stop all networks and return
 		if (msg.Device != nil) && !msg.Device.Enable {
-			log.Infof("Device is disabled, stopping all networks")
+			log.Error("Device is disabled, stopping all networks")
 			for i := 0; i < len(msg.Config); i++ {
+				log.Errorf("Stopping %s", msg.Config[i].NetName)
 				StopWireguard(msg.Config[i].NetName)
 			}
 			MergeDevices(msg.Device, &device)
@@ -948,15 +952,15 @@ func UpdateNetticaConfig(body []byte) {
 			return
 		}
 
-		if (msg.Device.CheckInterval != 0) && (msg.Device.CheckInterval != device.CheckInterval) {
-			log.Infof("CheckInterval has changed, new interval is %d", msg.Device.CheckInterval)
-			device.CheckInterval = msg.Device.CheckInterval
+		if msg.Device.Quiet != device.Quiet {
+			log.Errorf("Quiet has changed, new quiet is %t", msg.Device.Quiet)
+			device.Quiet = msg.Device.Quiet
 			saveConfig()
 		}
 
-		if msg.Device.Quiet != device.Quiet {
-			log.Infof("Quiet has changed, new quiet is %t", msg.Device.Quiet)
-			device.Quiet = msg.Device.Quiet
+		if (msg.Device.CheckInterval != 0) && (msg.Device.CheckInterval != device.CheckInterval) {
+			log.Infof("CheckInterval has changed, new interval is %d", msg.Device.CheckInterval)
+			device.CheckInterval = msg.Device.CheckInterval
 			saveConfig()
 		}
 
@@ -984,6 +988,20 @@ func UpdateNetticaConfig(body []byte) {
 			device.ApiKey = msg.Device.ApiKey
 			device.Id = msg.Device.Id
 			device.Registered = true
+			saveConfig()
+		}
+
+		if (msg.Device.Name != "") && (msg.Device.Name != device.Name) &&
+			msg.Device.Updated.After(device.Updated) {
+			log.Infof("Name has changed, new name is %s", msg.Device.Name)
+			device.Name = msg.Device.Name
+			saveConfig()
+		} else {
+			log.Infof("Not changing name, server has old stuff")
+		}
+
+		if msg.Device.AccountID != "" && msg.Device.AccountID != device.AccountID {
+			device.AccountID = msg.Device.AccountID
 			saveConfig()
 		}
 
