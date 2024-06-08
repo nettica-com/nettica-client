@@ -7,5 +7,5 @@ then
     sysctl -p
     systemctl daemon-reload
     systemctl enable nettica.service
-    systemctl start nettica.service
+    systemctl restart nettica.service
 fi

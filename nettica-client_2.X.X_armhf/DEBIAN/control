@@ -3,5 +3,5 @@ Version: 2.X.X
 Architecture: armhf
 Section: net
 Priority: standard
-Maintainer: nettica.com <info@nettica.app>
+Maintainer: nettica.com <info@nettica.com>
 Description: nettica-client for 32-bit debian distributions

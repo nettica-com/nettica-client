@@ -3,5 +3,5 @@ Version: 2.X.X
 Architecture: arm64
 Section: net
 Priority: standard
-Maintainer: nettica.com <info@nettica.app>
+Maintainer: nettica.com <info@nettica.com>
 Description: nettica-client for arm64 debian distributions
