@@ -1,6 +1,6 @@
 Name:           nettica
-Version:        2.1
-Release:        2%{?dist}
+Version:        2.6
+Release:        4%{?dist}
 Summary:        Nettica Client for RPM based linux systems
 
 License:        MIT
@@ -38,12 +38,12 @@ rm -rf $RPM_BUILD_ROOT/etc/
 
 %post
 /usr/bin/systemctl enable nettica.service > /dev/null 2>&1
-/usr/bin/systemctl start nettica.service
 exit 0
 %preun
 /usr/bin/systemctl stop nettica.service
 exit 0
-
+%posttrans
+/usr/bin/systemctl restart nettica.service
 
 %changelog
 * Tue Nov 16 2021 by ALan Graham
