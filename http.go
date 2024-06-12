@@ -288,7 +288,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		if EZCode == "undefined" {
 			EZCode = ""
 		}
-		if strings.HasPrefix(EZCode, "ez-") || (Server != "" && DeviceID != "" && ApiKey != "") {
+		if strings.HasPrefix(EZCode, "ez-") || (Server != "") {
 			device.Server = Server
 			device.Id = DeviceID
 			device.ApiKey = ApiKey
