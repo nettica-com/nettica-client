@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"strings"
 
 	"github.com/nettica-com/nettica-admin/model"
 	log "github.com/sirupsen/logrus"
@@ -95,7 +96,25 @@ func loadConfig() error {
 		device.InstanceID = os.Getenv("NETTICA_INSTANCE_ID")
 		device.EZCode = os.Getenv("NETTICA_EZCODE")
 
-		if os.Getenv("NETTICA_UPDATE_KEYS") == "false" {
+		value, present := os.LookupEnv("NETTICA_QUIET")
+		if present {
+			if value == "" || strings.ToLower(value) == "true" || value == "1" {
+				device.Quiet = true
+			} else {
+				device.Quiet = false
+			}
+		}
+
+		value, present = os.LookupEnv("NETTICA_DEBUG")
+		if present {
+			if value == "" || strings.ToLower(value) == "true" || value == "1" {
+				device.Debug = true
+			} else {
+				device.Debug = false
+			}
+		}
+
+		if strings.ToLower(os.Getenv("NETTICA_UPDATE_KEYS")) == "false" {
 			device.UpdateKeys = false
 		}
 
