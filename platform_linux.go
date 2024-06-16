@@ -134,13 +134,19 @@ func IsWireguardRunning(name string) (bool, error) {
 	return true, nil
 }
 
-// docker run -e NETTICA_HOST_ID=715d2d3d-2eb2-4f06-be90-4e8d679360a5 -e NETTICA_API_KEY=example -p 40000:40000 nettica-client
+// docker run -e NETTICA_DEVICE_ID=device-715d2d3d-example -e NETTICA_API_KEY=device-api-example -p 40000:40000 nettica-client
 
 func StartContainer(service model.Service) (string, error) {
 
 	port := fmt.Sprintf("%d", service.ServicePort)
 
-	var args = []string{"run", "--rm", "-d", "--cap-add", "NET_ADMIN", "--cap-add", "SYS_MODULE", "--sysctl", "net.ipv4.conf.all.src_valid_mark=1", "-e", "NETTICA_SERVER=" + service.Device.Server, "-e", "NETTICA_DEVICE_ID=" + service.Device.Id, "-e", "NETTICA_API_KEY=" + service.Device.ApiKey, "-e", "NETTICA_UPDATE_KEYS=false", "-p", port + ":" + port + "/udp", "nettica-client"}
+	var args = []string{"run", "--rm", "-d", "--cap-add", "NET_ADMIN", "--cap-add", "SYS_MODULE", "--sysctl", "net.ipv4.conf.all.src_valid_mark=1",
+		"-e", "NETTICA_SERVER=" + service.Device.Server,
+		"-e", "NETTICA_DEVICE_ID=" + service.Device.Id,
+		"-e", "NETTICA_API_KEY=" + service.Device.ApiKey,
+		"-e", "NETTICA_UPDATE_KEYS=false",
+		"-e", "NETTICA_SERVICE_HOST=true",
+		"-p", port + ":" + port + "/udp", "nettica-client"} // TODO: change nettica-client to nettica/nettica-client
 	cmd := exec.Command("docker", args...)
 	log.Infof("Starting container: %v", cmd)
 

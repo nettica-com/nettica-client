@@ -14,6 +14,9 @@ import (
 
 var device model.Device = model.Device{}
 
+// ServiceHost can only be set using an environment variable
+var ServiceHost = false
+
 var cfg struct {
 	sourceAddr *net.TCPAddr
 	init       bool
@@ -76,6 +79,8 @@ func loadConfig() error {
 
 	if !cfg.init {
 		cfg.init = true
+
+		_, ServiceHost = os.LookupEnv("NETTICA_SERVICE_HOST")
 
 		// configure defaults
 		device.Debug = false

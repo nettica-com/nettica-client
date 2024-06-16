@@ -919,6 +919,15 @@ func UpdateNetticaConfig(body []byte) {
 			return
 		}
 
+		// If this is a ServiceHost, validate the message before proceeding
+		if ServiceHost {
+			err := ValidateMessage(&msg)
+			if err != nil {
+				log.Errorf("Error validating message: %v", err)
+				return
+			}
+		}
+
 		file, err := os.OpenFile(GetDataPath()+"nettica.json", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 		if err != nil {
 			log.Errorf("Error opening nettica.json for write: %v", err)
@@ -996,8 +1005,6 @@ func UpdateNetticaConfig(body []byte) {
 			log.Infof("Name has changed, new name is %s", msg.Device.Name)
 			device.Name = msg.Device.Name
 			saveConfig()
-		} else {
-			log.Infof("Not changing name, server has old stuff")
 		}
 
 		if msg.Device.AccountID != "" && msg.Device.AccountID != device.AccountID {
@@ -1344,6 +1351,81 @@ func UpdateNetticaConfig(body []byte) {
 		FailSafeMsgSent = true
 	}
 
+}
+
+// ServiceHost containers must be hardened to prevent unauthorized access to the host
+// Check the following:
+// 1. There is only one VPN for this device
+// 2. The PreUp and PostDown scripts are not set
+// 3. The PostUp and PostDown don't have specific commands
+// 4. The Type of VPN is set to Service
+// 5. The overall Device and VPN conform to their models
+// This will allow the host to be used in the wild without fear of exploitation
+func ValidateMessage(msg *model.Message) error {
+
+	if !ServiceHost {
+		return nil
+	}
+
+	if len(msg.Config) != 1 {
+		return fmt.Errorf("only one network is allowed for this device")
+	}
+
+	errs := msg.Device.IsValid()
+	if len(errs) > 0 {
+		return fmt.Errorf("device is not valid: %v", errs)
+	}
+
+	// Check the VPN
+	index := -1
+	deviceid := msg.Device.Id
+	for i := 0; i < len(msg.Config); i++ {
+		for j := 0; j < len(msg.Config[i].VPNs); j++ {
+			if msg.Config[i].VPNs[j].DeviceID == deviceid {
+				index = j
+				break
+			}
+		}
+
+		if index == -1 {
+			return fmt.Errorf("vpn not found")
+		}
+
+		vpn := &msg.Config[i].VPNs[index]
+		errs = vpn.IsValid()
+		if len(errs) > 0 {
+			return fmt.Errorf("vpn is not valid: %v", errs)
+		}
+
+		if vpn.Type != "Service" {
+			return fmt.Errorf("invalid VPN type")
+		}
+
+		// Check PreUp and PostDown
+		if vpn.Current.PreUp != "" || vpn.Current.PostDown != "" {
+			return fmt.Errorf("invalid PreUp and PostDown")
+		}
+
+		// Check PostUp and PostDown
+		postUp := Sanitize(vpn.Current.PostUp)
+		postDown := Sanitize(vpn.Current.PostDown)
+		if postUp != vpn.Current.PostUp || postDown != vpn.Current.PostDown {
+			return fmt.Errorf("invalid PostUp and PostDown")
+		}
+
+		// Check for reserved words
+		// Note: The docker container doesn't have much installed to exploit
+		// and checking for apk ensures it stays that way
+		ReservedWords := []string{"apk", "ssh", "wget", "curl"}
+		for _, word := range ReservedWords {
+			if strings.Contains(postUp, word) || strings.Contains(postDown, word) {
+				return fmt.Errorf("invalid PostUp and PostDown")
+			}
+		}
+
+	}
+
+	return nil
 }
 
 func FindVPN(net string) (*model.VPN, *[]model.VPN, error) {
