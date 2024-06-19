@@ -199,7 +199,7 @@ func UpdateNetticaServiceHost(service model.Service) error {
 		return err
 	}
 	if req != nil {
-		req.Header.Set("X-API-KEY", device.ServiceApiKey)
+		req.Header.Set("X-API-KEY", service.ApiKey)
 		req.Header.Set("User-Agent", "nettica-client/2.0")
 		req.Header.Set("Content-Type", "application/json")
 	}
