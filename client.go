@@ -1402,8 +1402,8 @@ func ValidateMessage(msg *model.Message) error {
 		}
 
 		// Check PreUp and PostDown
-		if vpn.Current.PreUp != "" || vpn.Current.PostDown != "" {
-			return fmt.Errorf("invalid PreUp and PostDown")
+		if vpn.Current.PreUp != "" || vpn.Current.PreDown != "" {
+			return fmt.Errorf("invalid PreUp and PreDown")
 		}
 
 		// Check PostUp and PostDown
