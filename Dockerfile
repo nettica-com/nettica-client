@@ -11,7 +11,7 @@ RUN apk add --no-cache wireguard-tools
 RUN apk add --no-cache iptables
 RUN mkdir -p /etc/nettica
 COPY --from=builder /app/nettica-client /usr/bin
-COPY wg-hack/wg-quick /usr/bin
+COPY --from=builder /app/wg-hack/wg-quick /usr/bin
 RUN chmod +x /usr/bin/wg-quick
 USER root
 CMD ["/usr/bin/nettica-client"]

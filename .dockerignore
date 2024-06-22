@@ -1,0 +1,5 @@
+*.deb
+.env
+nettica-client_2.X.X*
+rpmbuild
+debian
