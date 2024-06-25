@@ -456,10 +456,6 @@ func QueryDNS(w dns.ResponseWriter, query *dns.Msg) {
 
 	defer LogMessage(query.Question[0].Name)
 
-	c := new(dns.Client)
-	c.Net = "udp"
-	c.Timeout = 5000 * time.Millisecond
-
 	q := strings.ToLower(query.Question[0].Name)
 	q = strings.Trim(q, ".")
 
