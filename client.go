@@ -1239,7 +1239,9 @@ func UpdateNetticaConfig(body []byte) {
 						// Stop the DNS if is running
 						if vpn.Current.EnableDns {
 							address := vpn.Current.Address[0]
-							address = address[0:strings.Index(address, "/")]
+							if strings.Contains(address, "/") {
+								address = address[0:strings.Index(address, "/")]
+							}
 							StopDNS(address)
 							// Since the DNS has a shared cache, we need to dump the whole thing.
 							// On recovery we'll rebuild it.
@@ -1324,7 +1326,9 @@ func UpdateNetticaConfig(body []byte) {
 					// Stop the DNS if is running
 					if vpn.Current.EnableDns {
 						address := vpn.Current.Address[0]
-						address = address[0:strings.Index(address, "/")]
+						if strings.Contains(address, "/") {
+							address = address[0:strings.Index(address, "/")]
+						}
 						StopDNS(address)
 					}
 
