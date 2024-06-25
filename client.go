@@ -1678,19 +1678,18 @@ func StartBackgroundRefreshService() {
 				// Iterate through this VPN's addresses and remove any subnets that match
 				// What should be left is the subnets that are local to this device
 				for k := 0; k < len(vpn.Current.Address); k++ {
-					_, ipnet, err := net.ParseCIDR(vpn.Current.Address[k])
+					network, err := GetNetworkAddress(vpn.Current.Address[k])
 					if err != nil {
 						log.Errorf("GetNetworkAddress, err = %v", err)
+						continue
 					}
 					for l := 0; l < len(subnets); l++ {
-						if subnets[l].Contains(ipnet.IP) {
+						if subnets[l].String() == network {
 							log.Errorf("From Local: Removing subnet %s from %s", subnets[l].String(), vpn.Name)
 							subnets = append(subnets[:l], subnets[l+1:]...)
-							break
 						}
 					}
 				}
-				log.Errorf("Subnets after: %v", subnets)
 
 				// If any of the AllowedIPs contain a local subnet, remove that entry
 				// This is to prevent routing loops and is very important
@@ -1698,19 +1697,24 @@ func StartBackgroundRefreshService() {
 					allowed := msg.Config[i].VPNs[k].Current.AllowedIPs
 					for l := 0; l < len(allowed); l++ {
 						inSubnet := false
-						_, s, _ := net.ParseCIDR(allowed[l])
+						if !strings.Contains(allowed[l], "/") {
+							continue
+						}
+						_, s, err := net.ParseCIDR(allowed[l])
+						if err != nil {
+							log.Errorf("net.ParseCIDR err = %v", err)
+							continue
+						}
 						for _, subnet := range subnets {
 							if subnet.Contains(s.IP) {
 								log.Errorf("From Foreign: Removing subnet %s from %s", allowed[l], vpn.Name)
 								inSubnet = true
-								break
 							}
 						}
 						if inSubnet {
 							msg.Config[i].VPNs[k].Current.AllowedIPs = append(allowed[:l], allowed[l+1:]...)
 						}
 					}
-					msg.Config[i].VPNs[k].Current.AllowedIPs = allowed
 				}
 
 				// Check to see if we have the private key
