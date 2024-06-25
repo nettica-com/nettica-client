@@ -1114,6 +1114,7 @@ func UpdateNetticaConfig(body []byte) {
 					network, err := GetNetworkAddress(vpn.Current.Address[k])
 					if err != nil {
 						log.Errorf("GetNetworkAddress, err = %v", err)
+						continue
 					}
 					for l := 0; l < len(subnets); l++ {
 						if subnets[l].String() == network {
@@ -1129,7 +1130,14 @@ func UpdateNetticaConfig(body []byte) {
 					allowed := msg.Config[i].VPNs[k].Current.AllowedIPs
 					for l := 0; l < len(allowed); l++ {
 						inSubnet := false
-						_, s, _ := net.ParseCIDR(allowed[l])
+						if !strings.Contains(allowed[l], "/") {
+							continue
+						}
+						_, s, err := net.ParseCIDR(allowed[l])
+						if err != nil {
+							log.Errorf("net.ParseCIDR err = %v", err)
+							continue
+						}
 						for _, subnet := range subnets {
 							if subnet.Contains(s.IP) {
 								log.Errorf("From Foreign: Removing subnet %s from %s", allowed[l], vpn.Name)
