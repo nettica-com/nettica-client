@@ -869,6 +869,19 @@ func UpdateVPN(vpn *model.VPN) error {
 	return nil
 }
 
+// GetNetworkAddress gets the valid start of a subnet
+func GetNetworkAddress(cidr string) (string, error) {
+
+	_, ipnet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return "", err
+	}
+	networkAddr := ipnet.String()
+
+	return networkAddr, nil
+
+}
+
 // UpdateNetticaConfig updates the config from the server
 func UpdateNetticaConfig(body []byte) {
 
@@ -1016,12 +1029,6 @@ func UpdateNetticaConfig(body []byte) {
 		var msg2 model.Message
 		json.Unmarshal(body, &msg2)
 
-		// Get our local subnets, called here to avoid duplication
-		subnets, err := GetLocalSubnets()
-		if err != nil {
-			log.Errorf("GetLocalSubnets, err = %v", err)
-		}
-
 		// first, delete any nets that are no longer in the conf
 		for i := 0; i < len(oldconf.Config); i++ {
 			found := false
@@ -1094,7 +1101,27 @@ func UpdateNetticaConfig(body []byte) {
 				// Configure UPnP as needed
 				go ConfigureUPnP(vpn)
 
-				// If any of the AllowedIPs contain our subnet, remove that entry
+				// Get our local subnets
+				subnets, err := GetLocalSubnets()
+				if err != nil {
+					log.Errorf("GetLocalSubnets, err = %v", err)
+				}
+
+				// Iterate through this VPN's addresses and remove any subnets that match
+				// What should be left is the subnets that are local to this device
+				for k := 0; k < len(vpn.Current.Address); k++ {
+					network, err := GetNetworkAddress(vpn.Current.Address[k])
+					if err != nil {
+						log.Errorf("GetNetworkAddress, err = %v", err)
+					}
+					for l := 0; l < len(subnets); l++ {
+						if subnets[l].String() == network {
+							subnets = append(subnets[:l], subnets[l+1:]...)
+						}
+					}
+				}
+
+				// If any of the AllowedIPs contain a local subnet, remove that entry
 				// This is to prevent routing loops and is very important
 				for k := 0; k < len(msg.Config[i].VPNs); k++ {
 					allowed := msg.Config[i].VPNs[k].Current.AllowedIPs
@@ -1609,12 +1636,6 @@ func StartBackgroundRefreshService() {
 			return
 		}
 
-		// Get our local subnets, called here to avoid duplication
-		subnets, err := GetLocalSubnets()
-		if err != nil {
-			log.Errorf("GetLocalSubnets, err = %v", err)
-		}
-
 		for i := 0; i < len(msg.Config); i++ {
 			index := -1
 			for j := 0; j < len(msg.Config[i].VPNs); j++ {
@@ -1631,6 +1652,26 @@ func StartBackgroundRefreshService() {
 
 				// Configure UPnP as needed
 				go ConfigureUPnP(vpn)
+
+				// Get our local subnets
+				subnets, err := GetLocalSubnets()
+				if err != nil {
+					log.Errorf("GetLocalSubnets, err = %v", err)
+				}
+
+				// Iterate through this VPN's addresses and remove any subnets that match
+				// What should be left is the subnets that are local to this device
+				for k := 0; k < len(vpn.Current.Address); k++ {
+					network, err := GetNetworkAddress(vpn.Current.Address[k])
+					if err != nil {
+						log.Errorf("GetNetworkAddress, err = %v", err)
+					}
+					for l := 0; l < len(subnets); l++ {
+						if subnets[l].String() == network {
+							subnets = append(subnets[:l], subnets[l+1:]...)
+						}
+					}
+				}
 
 				// If any of the AllowedIPs contain our subnet, remove that entry
 				for k := 0; k < len(msg.Config[i].VPNs); k++ {
