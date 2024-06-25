@@ -1106,6 +1106,7 @@ func UpdateNetticaConfig(body []byte) {
 				if err != nil {
 					log.Errorf("GetLocalSubnets, err = %v", err)
 				}
+				log.Errorf("Subnets: %v", subnets)
 
 				// Iterate through this VPN's addresses and remove any subnets that match
 				// What should be left is the subnets that are local to this device
@@ -1116,6 +1117,7 @@ func UpdateNetticaConfig(body []byte) {
 					}
 					for l := 0; l < len(subnets); l++ {
 						if subnets[l].String() == network {
+							log.Errorf("From Local: Removing subnet %s from %s", subnets[l].String(), vpn.Name)
 							subnets = append(subnets[:l], subnets[l+1:]...)
 						}
 					}
@@ -1130,6 +1132,7 @@ func UpdateNetticaConfig(body []byte) {
 						_, s, _ := net.ParseCIDR(allowed[l])
 						for _, subnet := range subnets {
 							if subnet.Contains(s.IP) {
+								log.Errorf("From Foreign: Removing subnet %s from %s", allowed[l], vpn.Name)
 								inSubnet = true
 							}
 						}
@@ -1658,22 +1661,27 @@ func StartBackgroundRefreshService() {
 				if err != nil {
 					log.Errorf("GetLocalSubnets, err = %v", err)
 				}
+				log.Errorf("Subnets: %v", subnets)
 
 				// Iterate through this VPN's addresses and remove any subnets that match
 				// What should be left is the subnets that are local to this device
 				for k := 0; k < len(vpn.Current.Address); k++ {
-					network, err := GetNetworkAddress(vpn.Current.Address[k])
+					_, ipnet, err := net.ParseCIDR(vpn.Current.Address[k])
 					if err != nil {
 						log.Errorf("GetNetworkAddress, err = %v", err)
 					}
 					for l := 0; l < len(subnets); l++ {
-						if subnets[l].String() == network {
+						if subnets[l].Contains(ipnet.IP) {
+							log.Errorf("From Local: Removing subnet %s from %s", subnets[l].String(), vpn.Name)
 							subnets = append(subnets[:l], subnets[l+1:]...)
+							break
 						}
 					}
 				}
+				log.Errorf("Subnets after: %v", subnets)
 
-				// If any of the AllowedIPs contain our subnet, remove that entry
+				// If any of the AllowedIPs contain a local subnet, remove that entry
+				// This is to prevent routing loops and is very important
 				for k := 0; k < len(msg.Config[i].VPNs); k++ {
 					allowed := msg.Config[i].VPNs[k].Current.AllowedIPs
 					for l := 0; l < len(allowed); l++ {
@@ -1681,14 +1689,18 @@ func StartBackgroundRefreshService() {
 						_, s, _ := net.ParseCIDR(allowed[l])
 						for _, subnet := range subnets {
 							if subnet.Contains(s.IP) {
+								log.Errorf("From Foreign: Removing subnet %s from %s", allowed[l], vpn.Name)
 								inSubnet = true
+								break
 							}
 						}
 						if inSubnet {
 							msg.Config[i].VPNs[k].Current.AllowedIPs = append(allowed[:l], allowed[l+1:]...)
 						}
 					}
+					msg.Config[i].VPNs[k].Current.AllowedIPs = allowed
 				}
+
 				// Check to see if we have the private key
 
 				key, found := KeyLookup(vpn.Current.PublicKey)

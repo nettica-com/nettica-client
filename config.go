@@ -101,8 +101,8 @@ func loadConfig() error {
 		device.InstanceID = os.Getenv("NETTICA_INSTANCE_ID")
 		device.EZCode = os.Getenv("NETTICA_EZCODE")
 
-		value, present := os.LookupEnv("NETTICA_QUIET")
-		if present {
+		value, qpresent := os.LookupEnv("NETTICA_QUIET")
+		if qpresent {
 			if value == "" || strings.ToLower(value) == "true" || value == "1" {
 				device.Quiet = true
 			} else {
@@ -110,8 +110,8 @@ func loadConfig() error {
 			}
 		}
 
-		value, present = os.LookupEnv("NETTICA_DEBUG")
-		if present {
+		value, dpresent := os.LookupEnv("NETTICA_DEBUG")
+		if dpresent {
 			if value == "" || strings.ToLower(value) == "true" || value == "1" {
 				device.Debug = true
 			} else {
@@ -159,7 +159,7 @@ func loadConfig() error {
 			device.Version = Version
 		}
 
-		if *quiet {
+		if *quiet && !qpresent {
 			device.Quiet = *quiet
 		}
 
@@ -214,6 +214,23 @@ func loadConfig() error {
 			return err
 		}
 		device.Version = Version
+		value, present := os.LookupEnv("NETTICA_QUIET")
+		if present {
+			if value == "" || strings.ToLower(value) == "true" || value == "1" {
+				device.Quiet = true
+			} else {
+				device.Quiet = false
+			}
+		}
+
+		value, present = os.LookupEnv("NETTICA_DEBUG")
+		if present {
+			if value == "" || strings.ToLower(value) == "true" || value == "1" {
+				device.Debug = true
+			} else {
+				device.Debug = false
+			}
+		}
 
 		log.Infof("Server:    %s", device.Server)
 		log.Infof("DeviceID:  %s", device.Id)
