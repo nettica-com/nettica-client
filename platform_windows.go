@@ -331,7 +331,7 @@ func InitializeDNS() error {
 
 func LaunchDNS(address string) (*dns.Server, error) {
 
-	server := &dns.Server{Addr: address, Net: "udp", TsigSecret: nil, ReusePort: true}
+	server := &dns.Server{Addr: address + ":53", Net: "udp", TsigSecret: nil, ReusePort: true}
 	log.Infof("Starting DNS Server on %s", address)
 	go func() {
 		FlushDNS()

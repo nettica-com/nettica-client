@@ -18,12 +18,10 @@ import (
 )
 
 type DNS struct {
-	ServerTable   map[string]string
-	DnsTable      map[string][]string
-	Resolvers     []string
-	DnsServers    map[string]*dns.Server
-	SearchDomains []string
-	Host          model.VPN
+	DnsTable      map[string][]string    // List of DNS entries.  key is the name of the entry.  value is the address or host name for PTR records
+	Resolvers     []string               // List of external DNS resolvers
+	DnsServers    map[string]*dns.Server // List of Nettica DNS servers.  key is the address of the server
+	SearchDomains []string               // List of search domains for lookups and to backhole queries to external resolvers
 }
 
 var (
@@ -113,7 +111,9 @@ func StartDNS() error {
 		}
 		if !found {
 			log.Infof("Stopping DNS Server: %s", address)
-			server.Shutdown()
+			if server != nil {
+				server.Shutdown()
+			}
 			delete(global.DnsServers, address)
 		}
 	}
@@ -138,8 +138,8 @@ func StartDNS() error {
 func ParseMessage(msg model.Message) (*DNS, error) {
 
 	var d DNS
+	var host model.VPN
 
-	d.ServerTable = make(map[string]string)
 	d.DnsTable = make(map[string][]string)
 	d.DnsServers = make(map[string]*dns.Server)
 	d.SearchDomains = make([]string, 0)
@@ -157,7 +157,7 @@ func ParseMessage(msg model.Message) (*DNS, error) {
 			return nil, errors.New("Error reading message")
 		} else {
 
-			d.Host = msg.Config[i].VPNs[index]
+			host = msg.Config[i].VPNs[index]
 
 			if msg.Config[i].VPNs[index].Enable && msg.Config[i].VPNs[index].Current.EnableDns {
 				for j := 0; j < len(msg.Config[i].VPNs); j++ {
@@ -178,32 +178,12 @@ func ParseMessage(msg model.Message) (*DNS, error) {
 						d.DnsTable[label] = []string{name}
 					}
 					d.DnsTable[name] = append(d.DnsTable[name], msg.Config[i].VPNs[j].Current.Address...)
-
-					// add the server to the server table
-					if msg.Config[i].VPNs[j].Current.Endpoint != "" {
-						ip_port := msg.Config[i].VPNs[j].Current.Endpoint
-						parts := strings.Split(ip_port, ":")
-						if len(parts) > 0 {
-							if len(parts[0]) == 2 {
-								// this is an ipv4 address
-								ip := parts[0]
-								d.ServerTable[ip] = ip
-							} else {
-								// this is an ipv6 address
-								parts = strings.Split(ip_port, "]")
-								if len(parts) > 0 {
-									ip := strings.Trim(parts[0], "[")
-									d.ServerTable[ip] = ip
-								}
-							}
-						}
-					}
 				}
 
 				// remove the host address from the list of resolvers
-				resolver := d.Host.Current.Dns
+				resolver := host.Current.Dns
 				for j := 0; j < len(resolver); j++ {
-					parts := strings.Split(d.Host.Current.Address[0], "/")
+					parts := strings.Split(host.Current.Address[0], "/")
 					if len(parts) > 0 && resolver[j] == parts[0] {
 						resolver = append(resolver[:j], resolver[j+1:]...)
 						break
@@ -213,17 +193,19 @@ func ParseMessage(msg model.Message) (*DNS, error) {
 				d.Resolvers = append(d.Resolvers, resolver...)
 				d.Resolvers = removeDuplicates(d.Resolvers)
 
-				// Add the server address but no server
-				if len(d.Host.Current.Address[0]) > 3 {
-					address := d.Host.Current.Address[0][:len(d.Host.Current.Address[0])-3] + ":53"
-					d.DnsServers[address] = nil
-				}
+				// Use the first address for the DNS server
+				address := host.Current.Address[0]
+				// Remove the CIDR if present
+				address = address[:strings.Index(address, "/")]
+				// Add the server to the list of servers, but don't start it yet
+				d.DnsServers[address] = nil
+
 			}
 
 			// add the search domains.  the network name is a search domain
-			d.SearchDomains = append(d.SearchDomains, strings.ToLower(d.Host.NetName))
+			d.SearchDomains = append(d.SearchDomains, strings.ToLower(host.NetName))
 
-			search := d.Host.Current.Dns
+			search := host.Current.Dns
 			for j := 0; j < len(search); j++ {
 				ip := net.ParseIP(search[j])
 				// if it's not an ip address then it's a search domain
@@ -293,9 +275,6 @@ func StopDNS(address string) error {
 	globalLock.Lock()
 	defer globalLock.Unlock()
 
-	if !strings.HasSuffix(address, ":53") {
-		address += ":53"
-	}
 	server := global.DnsServers[address]
 
 	// remove the server from the list of servers
