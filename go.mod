@@ -5,14 +5,14 @@ go 1.22.4
 require (
 	github.com/huin/goupnp v1.3.0
 	github.com/miekg/dns v1.1.61
-	github.com/nettica-com/nettica-admin v0.0.0-20240616003831-99a6b0164791
+	github.com/nettica-com/nettica-admin v0.0.0-20240625164303-21850376d000
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/sys v0.21.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
 )
 
 require (
-	github.com/bytedance/sonic v1.11.8 // indirect
+	github.com/bytedance/sonic v1.11.9 // indirect
 	github.com/bytedance/sonic/loader v0.1.1 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect

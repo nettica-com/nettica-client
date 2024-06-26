@@ -405,8 +405,13 @@ func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 				offset := rand.Intn(len(addrs))
 				for i := 0; i < len(addrs); i++ {
 					x := (offset + i) % len(addrs)
+					var ip net.IP
 					if !strings.Contains(addrs[x], ":") {
-						ip, _, _ := net.ParseCIDR(addrs[x])
+						if !strings.Contains(addrs[x], "/") {
+							ip = net.ParseIP(addrs[x])
+						} else {
+							ip, _, _ = net.ParseCIDR(addrs[x])
+						}
 						rr = &dns.A{Hdr: dns.RR_Header{Name: r.Question[0].Name,
 							Rrtype: dns.TypeA,
 							Class:  dns.ClassINET,
@@ -423,8 +428,13 @@ func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 				offset := rand.Intn(len(addrs))
 				for i := 0; i < len(addrs); i++ {
 					x := (offset + i) % len(addrs)
+					var ip net.IP
 					if strings.Contains(addrs[x], ":") {
-						ip, _, _ := net.ParseCIDR(addrs[x])
+						if strings.Contains(addrs[x], "/") {
+							ip, _, _ = net.ParseCIDR(addrs[x])
+						} else {
+							ip = net.ParseIP(addrs[x])
+						}
 						rr = &dns.AAAA{Hdr: dns.RR_Header{Name: r.Question[0].Name,
 							Rrtype: dns.TypeAAAA,
 							Class:  dns.ClassINET,
