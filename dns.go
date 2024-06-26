@@ -196,7 +196,9 @@ func ParseMessage(msg model.Message) (*DNS, error) {
 				// Use the first address for the DNS server
 				address := host.Current.Address[0]
 				// Remove the CIDR if present
-				address = address[:strings.Index(address, "/")]
+				if strings.Contains(address, "/") {
+					address = address[:strings.Index(address, "/")]
+				}
 				// Add the server to the list of servers, but don't start it yet
 				d.DnsServers[address] = nil
 
