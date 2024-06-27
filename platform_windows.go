@@ -329,19 +329,29 @@ func InitializeDNS() error {
 	return nil
 }
 
-func LaunchDNS(address string) (*dns.Server, error) {
+func LaunchDNS(address string) (*DNS_SERVER, error) {
 
-	server := &dns.Server{Addr: address + ":53", Net: "udp", TsigSecret: nil, ReusePort: true}
-	log.Infof("Starting DNS Server on %s", address)
+	var server DNS_SERVER
+	server.udp = &dns.Server{Addr: address + ":53", Net: "udp", TsigSecret: nil, ReusePort: true}
+	server.tcp = &dns.Server{Addr: address + ":53", Net: "tcp", TsigSecret: nil, ReusePort: true}
+
+	log.Infof("Starting UDP & TCP DNS Servers on %s", address)
 	go func() {
 		FlushDNS()
-		if err := server.ListenAndServe(); err != nil {
-			log.Warnf("Failed to setup the DNS server on %s: %s\n", address, err.Error())
+		if err := server.udp.ListenAndServe(); err != nil {
+			log.Warnf("Failed to setup the UDP DNS server on %s: %s", address, err.Error())
 			StopDNS(address)
 		}
 	}()
 
-	return server, nil
+	go func() {
+		if err := server.tcp.ListenAndServe(); err != nil {
+			log.Warnf("Failed to setup the TCP DNS server on %s: %s", address, err.Error())
+			StopDNS(address)
+		}
+	}()
+
+	return &server, nil
 }
 
 func FlushDNS() error {

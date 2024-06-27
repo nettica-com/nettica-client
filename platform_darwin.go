@@ -194,24 +194,30 @@ func RunService(svcName string) {
 func ServiceManager(svcName string, cmd string) {
 }
 
-var AppleServer *dns.Server
+var AppleServer *DNS_SERVER
 
 func InitializeDNS() error {
 
-	go func() {
-		server := &dns.Server{Addr: "127.0.0.1:53", Net: "udp", TsigSecret: nil, ReusePort: true}
-		if err := server.ListenAndServe(); err != nil {
-			log.Warnf("UpdateDNS: Failed to setup the DNS server on %s: %s\n", "127.0.0.1:53", err.Error())
-		} else {
-			AppleServer = server
-		}
+	AppleServer = &DNS_SERVER{}
 
+	go func() {
+		AppleServer.udp = &dns.Server{Addr: "127.0.0.1:53", Net: "udp", TsigSecret: nil, ReusePort: true}
+		if err := AppleServer.udp.ListenAndServe(); err != nil {
+			log.Warnf("UpdateDNS: Failed to setup the UDP DNS server on %s: %s", "127.0.0.1:53", err.Error())
+		}
+	}()
+
+	go func() {
+		AppleServer.tcp = &dns.Server{Addr: "127.0.0.1:53", Net: "tcp", TsigSecret: nil, ReusePort: true}
+		if err := AppleServer.udp.ListenAndServe(); err != nil {
+			log.Warnf("UpdateDNS: Failed to setup the TCP DNS server on %s: %s", "127.0.0.1:53", err.Error())
+		}
 	}()
 
 	return nil
 }
 
-func LaunchDNS(addr string) (*dns.Server, error) {
+func LaunchDNS(addr string) (*DNS_SERVER, error) {
 	return AppleServer, nil
 }
 

@@ -17,10 +17,15 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type DNS_SERVER struct {
+	udp *dns.Server
+	tcp *dns.Server
+}
+
 type DNS struct {
 	DnsTable      map[string][]string    // List of DNS entries.  key is the name of the entry.  value is the address or host name for PTR records
 	Resolvers     []string               // List of external DNS resolvers
-	DnsServers    map[string]*dns.Server // List of Nettica DNS servers.  key is the address of the server
+	DnsServers    map[string]*DNS_SERVER // List of Nettica DNS servers.  key is the address of the server
 	SearchDomains []string               // List of search domains for lookups and to backhole queries to external resolvers
 }
 
@@ -62,6 +67,7 @@ var blackhole = []string{
 }
 
 func StartDNS() error {
+
 	dns.HandleFunc(".", handleQueries)
 
 	InitializeDNS()
@@ -111,8 +117,11 @@ func StartDNS() error {
 		}
 		if !found {
 			log.Infof("Stopping DNS Server: %s", address)
-			if server != nil {
-				server.Shutdown()
+			if server.udp != nil {
+				server.udp.Shutdown()
+			}
+			if server.tcp != nil {
+				server.tcp.Shutdown()
 			}
 			delete(global.DnsServers, address)
 		}
@@ -121,11 +130,11 @@ func StartDNS() error {
 	global = *d
 
 	// loop through the dns servers and start them
-	for address, server := range global.DnsServers {
-		if server == nil {
-			server, _ := LaunchDNS(address)
-			if server != nil {
-				global.DnsServers[address] = server
+	for address, s := range global.DnsServers {
+		if s == nil {
+			s, _ := LaunchDNS(address)
+			if s != nil {
+				global.DnsServers[address] = s
 			}
 		}
 	}
@@ -141,7 +150,7 @@ func ParseMessage(msg model.Message) (*DNS, error) {
 	var host model.VPN
 
 	d.DnsTable = make(map[string][]string)
-	d.DnsServers = make(map[string]*dns.Server)
+	d.DnsServers = make(map[string]*DNS_SERVER)
 	d.SearchDomains = make([]string, 0)
 
 	for i := 0; i < len(msg.Config); i++ {
@@ -283,7 +292,12 @@ func StopDNS(address string) error {
 	delete(global.DnsServers, address)
 
 	if server != nil {
-		server.Shutdown()
+		if server.udp != nil {
+			server.udp.Shutdown()
+		}
+		if server.tcp != nil {
+			server.tcp.Shutdown()
+		}
 	}
 
 	return nil
@@ -317,13 +331,14 @@ func UpdateDNS(msg model.Message) error {
 			if a == address {
 				found = true
 				result.DnsServers[a] = server
-				log.Infof("Keeping DNS Server: %s", server.Addr)
+				log.Infof("Keeping DNS Server: %s", server.udp.Addr)
 				break
 			}
 		}
 		if !found {
 			log.Infof("Stopping DNS Server: %s", address)
-			server.Shutdown()
+			server.udp.Shutdown()
+			server.tcp.Shutdown()
 			delete(global.DnsServers, address)
 		}
 	}
@@ -500,8 +515,9 @@ func QueryDNS(w dns.ResponseWriter, query *dns.Msg) {
 			}
 
 			// Now make the query
+			// TODO: Handle large tcp zone transfers
 			var err error
-			response, err := MakeQuery(global.Resolvers[i]+":53", query)
+			response, err := MakeQuery(global.Resolvers[i]+":53", w.RemoteAddr().Network(), query)
 			if err == nil {
 
 				if response.Rcode == dns.RcodeSuccess {
@@ -536,9 +552,9 @@ func QueryDNS(w dns.ResponseWriter, query *dns.Msg) {
 	w.WriteMsg(query)
 }
 
-func MakeQuery(resolver string, q *dns.Msg) (*dns.Msg, error) {
+func MakeQuery(resolver string, net string, q *dns.Msg) (*dns.Msg, error) {
 	c := new(dns.Client)
-	c.Net = "udp"
+	c.Net = net
 	c.Timeout = 1000 * time.Millisecond
 
 	log.Infof("*** Resolver: %s Query: %s", resolver, q.Question[0].Name)
