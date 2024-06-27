@@ -495,196 +495,6 @@ func DeleteVPN(id string) error {
 
 }
 
-// function compares two devices and returns true if they are the same
-func CompareDevices(d1 *model.Device, d2 *model.Device) bool {
-
-	if (d1 == nil) || (d2 == nil) {
-		return false
-	}
-
-	if d1.Id != d2.Id {
-		return false
-	}
-
-	if d1.Registered != d2.Registered {
-		return false
-	}
-
-	if d1.InstanceID != d2.InstanceID {
-		return false
-	}
-
-	if d1.EZCode != d2.EZCode {
-		return false
-	}
-
-	if d1.Name != d2.Name {
-		return false
-	}
-
-	if d1.ApiKey != d2.ApiKey {
-		return false
-	}
-
-	if d1.Server != d2.Server {
-		return false
-	}
-
-	if d1.Quiet != d2.Quiet {
-		return false
-	}
-
-	if d1.Debug != d2.Debug {
-		return false
-	}
-
-	if d1.CheckInterval != d2.CheckInterval {
-		return false
-	}
-
-	if d1.Enable != d2.Enable {
-		return false
-	}
-
-	if d1.Platform != d2.Platform {
-		return false
-	}
-
-	if d1.Version != d2.Version {
-		return false
-	}
-
-	if d1.SourceAddress != d2.SourceAddress {
-		return false
-	}
-
-	if d1.Updated != d2.Updated {
-		return false
-	}
-
-	if d1.Created != d2.Created {
-		return false
-	}
-
-	if d1.ApiID != d2.ApiID {
-		return false
-	}
-
-	if d1.ClientID != d2.ClientID {
-		return false
-	}
-
-	if d1.AppData != d2.AppData {
-		return false
-	}
-
-	if d1.AuthDomain != d2.AuthDomain {
-		return false
-	}
-
-	if d1.AccountID != d2.AccountID {
-		return false
-	}
-
-	if d1.ServiceGroup != d2.ServiceGroup {
-		return false
-	}
-
-	if d1.ServiceApiKey != d2.ServiceApiKey {
-		return false
-	}
-
-	return true
-}
-
-// function merges two devices, d1 is the source, d2 is the destination
-// use this function to merge messages from the server back to the client.
-func MergeDevices(d1 *model.Device, d2 *model.Device) {
-
-	if (d1 == nil) || (d2 == nil) {
-		return
-	}
-
-	// Some properties, like Quiet and Debug cannot be controlled by the server
-	// InstanceID is not managed by the server
-	// Version is not managed by the server
-
-	if d1.Id != d2.Id {
-		d2.Id = d1.Id
-	}
-
-	if d1.Registered {
-		d2.Registered = true
-	}
-
-	if d1.Name != "" {
-		d2.Name = d1.Name
-	}
-
-	if d1.ApiKey != "" {
-		d2.ApiKey = d1.ApiKey
-	}
-
-	if d1.Server != "" {
-		d2.Server = d1.Server
-	}
-
-	if d1.CheckInterval != 0 {
-		d2.CheckInterval = d1.CheckInterval
-	}
-	if d2.CheckInterval == 0 {
-		d2.CheckInterval = 10
-	}
-
-	d2.Enable = d1.Enable
-
-	if d1.Platform != "" {
-		d2.Platform = d1.Platform
-	}
-
-	if d1.SourceAddress != "" {
-		d2.SourceAddress = d1.SourceAddress
-	}
-
-	d2.Updated = d1.Updated
-	d2.Created = d1.Created
-
-	if d1.ApiID != "" {
-		d2.ApiID = d1.ApiID
-	}
-
-	if d1.ClientID != "" {
-		d2.ClientID = d1.ClientID
-	}
-
-	if d1.AppData != "" {
-		d2.AppData = d1.AppData
-	}
-
-	if d1.AuthDomain != "" {
-		d2.AuthDomain = d1.AuthDomain
-	}
-
-	if d1.AccountID != "" {
-		d2.AccountID = d1.AccountID
-	}
-
-	if d1.ServiceGroup != "" {
-		d2.ServiceGroup = d1.ServiceGroup
-	}
-
-	if d1.ServiceApiKey != "" {
-		d2.ServiceApiKey = d1.ServiceApiKey
-	}
-
-	if d1.InstanceID != "" {
-		d2.InstanceID = d1.InstanceID
-	}
-
-	d2.EZCode = d1.EZCode
-
-}
-
 func UpdateNetticaDevice(d model.Device) error {
 
 	log.Infof("UPDATING DEVICE: %v", d)
@@ -867,19 +677,6 @@ func UpdateVPN(vpn *model.VPN) error {
 	}
 
 	return nil
-}
-
-// GetNetworkAddress gets the valid start of a subnet
-func GetNetworkAddress(cidr string) (string, error) {
-
-	_, ipnet, err := net.ParseCIDR(cidr)
-	if err != nil {
-		return "", err
-	}
-	networkAddr := ipnet.String()
-
-	return networkAddr, nil
-
 }
 
 // UpdateNetticaConfig updates the config from the server
@@ -1150,7 +947,7 @@ func UpdateNetticaConfig(body []byte) {
 					}
 				}
 
-				// Check to see if we have the private key
+				// Check to see if we have a private key for this public key
 				key, found := KeyLookup(vpn.Current.PublicKey)
 				if !found {
 					KeyAdd(vpn.Current.PublicKey, vpn.Current.PrivateKey)
@@ -1275,20 +1072,6 @@ func UpdateNetticaConfig(body []byte) {
 							log.Errorf("Error starting wireguard: %v", err)
 						}
 
-						/*if (vpn.Current.EnableDns) && (err == nil) {
-							var msg3 model.Message
-							json.Unmarshal(body, &msg3)
-							err = UpdateDNS(msg3)
-							if err != nil {
-								log.Errorf("Error updating DNS configuration: %v", err)
-							} else {
-								vpn.Failover = NOFAILOVER
-
-								if err = UpdateVPN(&vpn); err != nil {
-									log.Errorf("Error updating VPN: %v", err)
-								}
-							}
-						}*/
 						FailSafeActed = true
 
 					}
@@ -1297,23 +1080,6 @@ func UpdateNetticaConfig(body []byte) {
 					// Skip the rest of this processing because it's for normal operations
 					continue
 				}
-
-				/*
-					// Handle recovery from FailSafe
-					if !FailSafe && vpn.Failover == FAILOVER {
-						vpn.Enable = true
-						vpn.Failover = NOFAILOVER
-						force = true
-						if err = UpdateVPN(&vpn); err != nil {
-							log.Errorf("Error updating VPN: %v", err)
-						}
-
-						if err == nil {
-							msg.Config[i].VPNs[index] = vpn
-							i-- // reprocess this network
-							continue
-						}
-					}*/
 
 				if !force && bytes.Equal(bits, text) {
 					log.Infof("*** SKIPPING %s *** No changes!", name)
@@ -1443,7 +1209,7 @@ func ValidateMessage(msg *model.Message) error {
 			return fmt.Errorf("invalid VPN type")
 		}
 
-		// Check PreUp and PostDown
+		// Check PreUp and PreDown
 		if vpn.Current.PreUp != "" || vpn.Current.PreDown != "" {
 			return fmt.Errorf("invalid PreUp and PreDown")
 		}
@@ -1584,31 +1350,6 @@ func StopAllVPNs() error {
 	}
 
 	return nil
-}
-
-func GetLocalSubnets() ([]*net.IPNet, error) {
-	ifaces, err := net.Interfaces()
-
-	if err != nil {
-		return nil, err
-	}
-
-	subnets := make([]*net.IPNet, 0)
-
-	for _, i := range ifaces {
-		addrs, err := i.Addrs()
-		if err != nil {
-			return nil, err
-		}
-
-		for _, addr := range addrs {
-			switch v := addr.(type) {
-			case *net.IPNet:
-				subnets = append(subnets, v)
-			}
-		}
-	}
-	return subnets, nil
 }
 
 // This needs to be refactored with the main logic above

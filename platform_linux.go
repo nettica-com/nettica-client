@@ -27,28 +27,6 @@ func Platform() string {
 	return "Linux"
 }
 
-func Sanitize(s string) string {
-
-	// remove path and shell special characters
-	s = strings.Replace(s, "/", "", -1)
-	s = strings.Replace(s, "\\", "", -1)
-	s = strings.Replace(s, ":", "", -1)
-	s = strings.Replace(s, "*", "", -1)
-	s = strings.Replace(s, "?", "", -1)
-	s = strings.Replace(s, "\"", "", -1)
-	s = strings.Replace(s, "<", "", -1)
-	s = strings.Replace(s, ">", "", -1)
-	s = strings.Replace(s, "|", "", -1)
-	s = strings.Replace(s, "&", "", -1)
-	s = strings.Replace(s, "%", "", -1)
-	s = strings.Replace(s, "$", "", -1)
-	s = strings.Replace(s, "#", "", -1)
-	s = strings.Replace(s, "@", "", -1)
-	s = strings.Replace(s, "!", "", -1)
-
-	return s
-}
-
 func GetStats(net string) (string, error) {
 
 	net = Sanitize(net)

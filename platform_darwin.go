@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/miekg/dns"
@@ -24,28 +23,6 @@ func GetDataPath() string {
 // Return the platform
 func Platform() string {
 	return "MacOS"
-}
-
-func Sanitize(s string) string {
-
-	// remove path and shell special characters
-	s = strings.Replace(s, "/", "", -1)
-	s = strings.Replace(s, "\\", "", -1)
-	s = strings.Replace(s, ":", "", -1)
-	s = strings.Replace(s, "*", "", -1)
-	s = strings.Replace(s, "?", "", -1)
-	s = strings.Replace(s, "\"", "", -1)
-	s = strings.Replace(s, "<", "", -1)
-	s = strings.Replace(s, ">", "", -1)
-	s = strings.Replace(s, "|", "", -1)
-	s = strings.Replace(s, "&", "", -1)
-	s = strings.Replace(s, "%", "", -1)
-	s = strings.Replace(s, "$", "", -1)
-	s = strings.Replace(s, "#", "", -1)
-	s = strings.Replace(s, "@", "", -1)
-	s = strings.Replace(s, "!", "", -1)
-
-	return s
 }
 
 func GetStats(net string) (string, error) {

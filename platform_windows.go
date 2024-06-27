@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 	"time"
 
 	"golang.org/x/sys/windows/svc"
@@ -42,28 +41,6 @@ func GetStats(net string) (string, error) {
 		return "nodata 0 0", err
 	}
 	return string(out), nil
-}
-
-func Sanitize(s string) string {
-
-	// remove path and shell special characters
-	s = strings.Replace(s, "/", "", -1)
-	s = strings.Replace(s, "\\", "", -1)
-	s = strings.Replace(s, ":", "", -1)
-	s = strings.Replace(s, "*", "", -1)
-	s = strings.Replace(s, "?", "", -1)
-	s = strings.Replace(s, "\"", "", -1)
-	s = strings.Replace(s, "<", "", -1)
-	s = strings.Replace(s, ">", "", -1)
-	s = strings.Replace(s, "|", "", -1)
-	s = strings.Replace(s, "&", "", -1)
-	s = strings.Replace(s, "%", "", -1)
-	s = strings.Replace(s, "$", "", -1)
-	s = strings.Replace(s, "#", "", -1)
-	s = strings.Replace(s, "@", "", -1)
-	s = strings.Replace(s, "!", "", -1)
-
-	return s
 }
 
 func InstallWireguard(netName string) error {
