@@ -528,7 +528,7 @@ func QueryDNS(w dns.ResponseWriter, query *dns.Msg) {
 				log.Infof("--- Query to %s failed: %s %s", global.Resolvers[i], q, dns.RcodeToString[response.Rcode])
 
 			} else {
-				log.Errorf("*** Error:   %v", err)
+				log.Errorf("*** Error: %s %v", q, err)
 			}
 		}
 	}
