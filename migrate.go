@@ -79,16 +79,15 @@ func Migrate() {
 	data, err := os.ReadFile(GetDataPath() + "nettica.json")
 	if err != nil {
 		log.Printf("Failed to read file %s: %v", "nettica.json", err)
-		return
 	} else {
 		err = json.Unmarshal(data, &msg)
 		if err != nil {
 			name := msg.Device.Server
 			name = strings.Replace("https://", "", name, -1)
 			name = strings.Replace("http://", "", name, -1)
-			err = os.Rename(GetDataPath()+"nettica.json", GetDataPath()+name+".json")
+			err = os.WriteFile(GetDataPath()+name+".json", data, 0644)
 			if err != nil {
-				log.Error("Failed to rename nettica.json: ", err)
+				log.Errorf("Failed to create %s.json: %v", name, err)
 			}
 		}
 	}

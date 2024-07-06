@@ -52,6 +52,10 @@ func LoadServers() error {
 			if file.Name() == "nettica.json" {
 				continue
 			}
+			if file.Name() == "keys.json" {
+				continue
+			}
+
 			path := filepath.Join(dir, file.Name())
 
 			data, err := os.ReadFile(path)
@@ -64,7 +68,13 @@ func LoadServers() error {
 				log.Printf("Failed to unmarshal JSON from file %s: %v", path, err)
 				continue
 			}
-			server.Name = server.Config.Device.Server
+
+			if server.Config.Device != nil && server.Config.Device.Server != "" {
+				server.Name = server.Config.Device.Server
+			} else {
+				server.Name = strings.TrimSuffix(file.Name(), ".json")
+			}
+
 			server.Path = path
 			server.Body = data
 			server.Running = make(chan bool)
