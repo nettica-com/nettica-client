@@ -43,6 +43,25 @@ func Migrate() {
 		log.Error("Failed to create original directory: ", err)
 	}
 
+	// temporarily copy the file instead of renaming it so old agent can still read it
+	//err = os.Rename(GetDataPath()+"nettica.json", GetDataPath()+"my.nettica.com.json")
+	var msg model.Message
+	data, err := os.ReadFile(GetDataPath() + "nettica.json")
+	if err != nil {
+		log.Printf("Failed to read file %s: %v", "nettica.json", err)
+	} else {
+		err = json.Unmarshal(data, &msg)
+		if err != nil {
+			name := msg.Device.Server
+			name = strings.Replace("https://", "", name, -1)
+			name = strings.Replace("http://", "", name, -1)
+			err = os.WriteFile(GetDataPath()+name+".json", data, 0644)
+			if err != nil {
+				log.Errorf("Failed to create %s.json: %v", name, err)
+			}
+		}
+	}
+
 	err = Copy(original+"nettica.json", GetDataPath()+"nettica.json")
 	if err != nil {
 		log.Error("Failed to copy nettica.json: ", err)
@@ -71,25 +90,6 @@ func Migrate() {
 	err = Copy(original+"nettica-service-host.json", GetDataPath()+"nettica-service-host.json")
 	if err != nil {
 		log.Error("Failed to copy nettica-service-host.json: ", err)
-	}
-
-	// temporarily copy the file instead of renaming it so old agent can still read it
-	//err = os.Rename(GetDataPath()+"nettica.json", GetDataPath()+"my.nettica.com.json")
-	var msg model.Message
-	data, err := os.ReadFile(GetDataPath() + "nettica.json")
-	if err != nil {
-		log.Printf("Failed to read file %s: %v", "nettica.json", err)
-	} else {
-		err = json.Unmarshal(data, &msg)
-		if err != nil {
-			name := msg.Device.Server
-			name = strings.Replace("https://", "", name, -1)
-			name = strings.Replace("http://", "", name, -1)
-			err = os.WriteFile(GetDataPath()+name+".json", data, 0644)
-			if err != nil {
-				log.Errorf("Failed to create %s.json: %v", name, err)
-			}
-		}
 	}
 
 	err = os.Rename(GetDataPath()+"nettica-service-host.json", GetDataPath()+"my.nettica.com-service-host.json")
