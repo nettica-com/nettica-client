@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
 	"os"
 	"runtime"
 	"strings"
 
+	"github.com/nettica-com/nettica-admin/model"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -73,9 +75,22 @@ func Migrate() {
 
 	// temporarily copy the file instead of renaming it so old agent can still read it
 	//err = os.Rename(GetDataPath()+"nettica.json", GetDataPath()+"my.nettica.com.json")
-	err = Copy(GetDataPath()+"my.nettica.com.json", GetDataPath()+"nettica.json")
+	var msg model.Message
+	data, err := os.ReadFile(GetDataPath() + "nettica.json")
 	if err != nil {
-		log.Error("Failed to rename nettica.json: ", err)
+		log.Printf("Failed to read file %s: %v", "nettica.json", err)
+		return
+	} else {
+		err = json.Unmarshal(data, &msg)
+		if err != nil {
+			name := msg.Device.Server
+			name = strings.Replace("https://", "", name, -1)
+			name = strings.Replace("http://", "", name, -1)
+			err = os.Rename(GetDataPath()+"nettica.json", GetDataPath()+name+".json")
+			if err != nil {
+				log.Error("Failed to rename nettica.json: ", err)
+			}
+		}
 	}
 
 	err = os.Rename(GetDataPath()+"nettica-service-host.json", GetDataPath()+"my.nettica.com-service-host.json")
@@ -118,6 +133,7 @@ func Copy(dst string, src string) error {
 	// Copy the file
 	_, err = io.Copy(dFile, sFile)
 	if err != nil {
+		dFile.Close()
 		return err
 	}
 
