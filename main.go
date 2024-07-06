@@ -6,6 +6,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/nettica-com/nettica-admin/model"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -38,51 +39,37 @@ func main() {
 
 	log.SetLevel(log.InfoLevel)
 
-	if device.Quiet {
+	if cfg.quiet {
 		log.SetLevel(log.ErrorLevel)
 	}
 
-	if device.Debug {
+	if cfg.debug {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	if device.Id == "" && !device.Registered {
-		go DiscoverDevice(&device)
-	}
+	log.SetLevel(log.InfoLevel)
 
-	d, err := GetNetticaDevice()
-	if err != nil {
-		log.Errorf("Could not get device: %v", err)
-	}
-	merged := false
+	// Migrate if needed
+	Migrate()
 
-	if d != nil {
+	// If the config is set by environment variables, ignore
+	// the config file
+	if cfg.Server != "" && cfg.DeviceID != "" && cfg.ApiKey != "" {
+		log.Info("Using environment variables for configuration")
+		msg := model.Message{}
+		msg.Device = &model.Device{}
+		msg.Device.Server = cfg.Server
+		msg.Device.Id = cfg.DeviceID
+		msg.Device.ApiKey = cfg.ApiKey
+		msg.Device.UpdateKeys = cfg.UpdateKeys
+		msg.Device.Quiet = cfg.quiet
+		msg.Device.Debug = cfg.debug
+		msg.Device.Enable = true
 
-		if !CompareDevices(d, &device) {
-			log.Infof("Device changed, saving config")
-			MergeDevices(d, &device)
-			merged = true
-			err = saveConfig()
-			if err != nil {
-				log.Errorf("Could not save config: %v", err)
-			}
-			err = reloadConfig()
-			if err != nil {
-				log.Errorf("Could not reload config: %v", err)
-			}
-		}
-	}
-
-	if !device.Enable {
-		log.Info("Device is disabled, exiting")
-		return
-	}
-
-	if merged {
-		err = UpdateNetticaDevice(device)
-		if err != nil {
-			log.Errorf("Could not update device: %v", err)
-		}
+		server := NewServer(msg.Device.Server, msg)
+		ServersMutex.Lock()
+		Servers["env"] = server
+		ServersMutex.Unlock()
 	}
 
 	KeyInitialize()
@@ -106,7 +93,6 @@ func main() {
 		log.Infof("Nettica Control Plane Started")
 
 		DoWork()
-		DoServiceWork()
 
 		sigs := make(chan os.Signal, 1)
 		done := make(chan bool, 1)

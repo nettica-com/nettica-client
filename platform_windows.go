@@ -38,7 +38,7 @@ func GetStats(net string) (string, error) {
 	out, err := exec.Command("wg.exe", args...).Output()
 	if err != nil {
 		log.Debugf("Error getting stats: %v (%s)", err, string(out))
-		return "nodata 0 0", err
+		return "nodata 0 0", nil
 	}
 	return string(out), nil
 }

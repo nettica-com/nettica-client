@@ -101,22 +101,6 @@ func CompareDevices(d1 *model.Device, d2 *model.Device) bool {
 		return false
 	}
 
-	if d1.ApiID != d2.ApiID {
-		return false
-	}
-
-	if d1.ClientID != d2.ClientID {
-		return false
-	}
-
-	if d1.AppData != d2.AppData {
-		return false
-	}
-
-	if d1.AuthDomain != d2.AuthDomain {
-		return false
-	}
-
 	if d1.AccountID != d2.AccountID {
 		return false
 	}
@@ -183,22 +167,6 @@ func MergeDevices(d1 *model.Device, d2 *model.Device) {
 
 	d2.Updated = d1.Updated
 	d2.Created = d1.Created
-
-	if d1.ApiID != "" {
-		d2.ApiID = d1.ApiID
-	}
-
-	if d1.ClientID != "" {
-		d2.ClientID = d1.ClientID
-	}
-
-	if d1.AppData != "" {
-		d2.AppData = d1.AppData
-	}
-
-	if d1.AuthDomain != "" {
-		d2.AuthDomain = d1.AuthDomain
-	}
 
 	if d1.AccountID != "" {
 		d2.AccountID = d1.AccountID

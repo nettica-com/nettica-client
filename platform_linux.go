@@ -36,7 +36,7 @@ func GetStats(net string) (string, error) {
 	out, err := exec.Command("wg", args...).Output()
 	if err != nil {
 		log.Debugf("Error getting statistics: %v (%s)", err, string(out))
-		return "nodata 0 0", err
+		return "nodata 0 0", nil
 	}
 
 	return string(out), nil
@@ -206,7 +206,6 @@ func InService() (bool, error) {
 func RunService(svcName string) {
 
 	DoWork()
-	DoServiceWork()
 
 	log.Info("setting up signal handlers")
 	sigs := make(chan os.Signal, 1)

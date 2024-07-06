@@ -4,10 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math/rand"
 	"net"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -32,6 +30,8 @@ type DNS struct {
 var (
 	global     DNS
 	globalLock sync.Mutex
+
+// quiet      bool
 )
 
 var blackhole = []string{
@@ -72,46 +72,53 @@ func StartDNS() error {
 
 	InitializeDNS()
 
-	var conf []byte
 	for exists := false; !exists; {
-		file, err := os.Open(GetDataPath() + "nettica.json")
-		if err != nil {
+
+		if len(Servers) == 0 {
 			time.Sleep(time.Second)
 		} else {
-			conf, err = io.ReadAll(file)
-			file.Close()
-			if err != nil {
-				log.Errorf("Error reading nettica config file: %v", err)
-				time.Sleep(time.Second)
-			} else {
-				exists = true
-			}
+			exists = true
 		}
 	}
 
-	var msg model.Message
-	err := json.Unmarshal(conf, &msg)
-	if err != nil {
-		log.Errorf("Error reading message from config file")
-		return err
-	}
+	var aggregate DNS
+	aggregate.DnsTable = make(map[string][]string)
+	aggregate.DnsServers = make(map[string]*DNS_SERVER)
+	aggregate.Resolvers = make([]string, 0)
+	aggregate.SearchDomains = make([]string, 0)
 
-	d, err := ParseMessage(msg)
-	if err != nil {
-		log.Errorf("Error parsing message: %v", err)
-		return err
-	}
+	for _, s := range Servers {
 
-	globalLock.Lock()
-	defer globalLock.Unlock()
+		var msg model.Message
+		err := json.Unmarshal(s.Body, &msg)
+		if err != nil {
+			log.Errorf("Error reading message from config file")
+			return err
+		}
+
+		d, err := ParseMessage(msg)
+		if err != nil {
+			log.Errorf("Error parsing message: %v", err)
+			return err
+		}
+
+		aggregate.Resolvers = append(aggregate.Resolvers, d.Resolvers...)
+		aggregate.SearchDomains = append(aggregate.SearchDomains, d.SearchDomains...)
+		for address, server := range d.DnsServers {
+			aggregate.DnsServers[address] = server
+		}
+		for label, name := range d.DnsTable {
+			aggregate.DnsTable[label] = name
+		}
+	}
 
 	// loop through the dns server and stop them if they are not in the new list
 	for address, server := range global.DnsServers {
 		found := false
-		for a := range d.DnsServers {
+		for a := range aggregate.DnsServers {
 			if a == address {
 				found = true
-				d.DnsServers[a] = server
+				aggregate.DnsServers[a] = server
 				break
 			}
 		}
@@ -127,7 +134,10 @@ func StartDNS() error {
 		}
 	}
 
-	global = *d
+	globalLock.Lock()
+	defer globalLock.Unlock()
+
+	global = aggregate
 
 	// loop through the dns servers and start them
 	for address, s := range global.DnsServers {
@@ -139,7 +149,9 @@ func StartDNS() error {
 		}
 	}
 
-	log.Infof("DNS Resolvers: %v", d.Resolvers)
+	global.Resolvers = removeDuplicates(global.Resolvers)
+
+	log.Infof("DNS Resolvers: %v", global.Resolvers)
 
 	return nil
 }
@@ -156,7 +168,7 @@ func ParseMessage(msg model.Message) (*DNS, error) {
 	for i := 0; i < len(msg.Config); i++ {
 		index := -1
 		for j := 0; j < len(msg.Config[i].VPNs); j++ {
-			if msg.Config[i].VPNs[j].DeviceID == device.Id {
+			if msg.Config[i].VPNs[j].DeviceID == msg.Device.Id {
 				index = j
 				break
 			}
@@ -316,52 +328,8 @@ func DropCache() error {
 
 func UpdateDNS(msg model.Message) error {
 	log.Info("==================== UPDATE DNS ====================")
-	result, err := ParseMessage(msg)
-	if err != nil {
-		return err
-	}
 
-	globalLock.Lock()
-	defer globalLock.Unlock()
-
-	// loop through the dns server and stop them if they are not in the new list
-	for address, server := range global.DnsServers {
-		found := false
-		for a := range result.DnsServers {
-			if a == address {
-				found = true
-				result.DnsServers[a] = server
-				log.Infof("Keeping DNS Server: %s", server.udp.Addr)
-				break
-			}
-		}
-		if !found {
-			log.Infof("Stopping DNS Server: %s", address)
-			server.udp.Shutdown()
-			server.tcp.Shutdown()
-			delete(global.DnsServers, address)
-		}
-	}
-
-	global = *result
-
-	// loop through the dns servers and start any that need it
-	for address, server := range global.DnsServers {
-		if server == nil {
-			log.Infof(" ************************************* Starting DNS Server: %s *************************************", address)
-			server, err := LaunchDNS(address)
-			if err != nil {
-				log.Errorf("Error starting DNS Server: %v", err)
-			}
-			if server != nil {
-				global.DnsServers[address] = server
-			}
-		}
-	}
-
-	log.Infof("DNS Resolvers: %v", global.Resolvers)
-
-	return nil
+	return StartDNS()
 }
 
 func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
@@ -370,9 +338,9 @@ func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 	q := strings.ToLower(r.Question[0].Name)
 	q = strings.Trim(q, ".")
 
-	if !device.Quiet {
-		log.Infof("DNS Query: %s", q)
-	}
+	//	if !device.Quiet {
+	//		log.Infof("DNS Query: %s", q)
+	//	}
 
 	switch r.Question[0].Qtype {
 
@@ -557,36 +525,34 @@ func MakeQuery(resolver string, net string, q *dns.Msg) (*dns.Msg, error) {
 	c.Net = net
 	c.Timeout = 1000 * time.Millisecond
 
-	log.Infof("*** Resolver: %s Query: %s", resolver, q.Question[0].Name)
+	//	log.Infof("*** Resolver: %s Query: %s", resolver, q.Question[0].Name)
 
 	// Measure the time it takes to get a response
-	start := time.Now()
+	//	start := time.Now()
 
 	r, _, err := c.Exchange(q, resolver)
 	if err != nil {
 		return nil, err
 	}
 
-	end := time.Now()
-	took := end.Sub(start)
-
-	if !device.Quiet {
-		s := fmt.Sprintf("**** Response: %s (%v)   %s   %s   %s   ", resolver, took, dns.RcodeToString[r.Rcode], q.Question[0].Name, dns.Type(r.Question[0].Qtype).String())
-		if r.Rcode == dns.RcodeSuccess && len(r.Answer) > 0 {
-			s += fmt.Sprintf("%s   ", dns.Type(r.Answer[0].Header().Rrtype))
-			if r.Answer[0].Header().Rrtype == dns.TypeA {
-				s += r.Answer[0].(*dns.A).A.String()
-			} else if r.Answer[0].Header().Rrtype == dns.TypeAAAA {
-				s += r.Answer[0].(*dns.AAAA).AAAA.String()
-			} else if r.Answer[0].Header().Rrtype == dns.TypePTR {
-				s += r.Answer[0].(*dns.PTR).Ptr
-			} else if r.Answer[0].Header().Rrtype == dns.TypeCNAME {
-				s += r.Answer[0].(*dns.CNAME).Target
+	/*	end := time.Now()
+		took := end.Sub(start)
+		if !quiet {
+			s := fmt.Sprintf("**** Response: %s (%v)   %s   %s   %s   ", resolver, took, dns.RcodeToString[r.Rcode], q.Question[0].Name, dns.Type(r.Question[0].Qtype).String())
+			if r.Rcode == dns.RcodeSuccess && len(r.Answer) > 0 {
+				s += fmt.Sprintf("%s   ", dns.Type(r.Answer[0].Header().Rrtype))
+				if r.Answer[0].Header().Rrtype == dns.TypeA {
+					s += r.Answer[0].(*dns.A).A.String()
+				} else if r.Answer[0].Header().Rrtype == dns.TypeAAAA {
+					s += r.Answer[0].(*dns.AAAA).AAAA.String()
+				} else if r.Answer[0].Header().Rrtype == dns.TypePTR {
+					s += r.Answer[0].(*dns.PTR).Ptr
+				} else if r.Answer[0].Header().Rrtype == dns.TypeCNAME {
+					s += r.Answer[0].(*dns.CNAME).Target
+				}
 			}
-		}
-		log.Infof(s)
-	}
-
+			log.Infof(s)
+		}*/
 	return r, nil
 }
 

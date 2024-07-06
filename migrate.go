@@ -17,9 +17,26 @@ func Migrate() {
 		return
 	}
 
+	if _, err := os.Stat(GetDataPath() + "nettica.json"); err != nil {
+		if _, err := os.Stat(GetDataPath() + "nettica.conf"); err != nil {
+			if _, err := os.Stat(GetDataPath() + "keys.json"); err != nil {
+				if _, err := os.Stat(GetDataPath() + "nettica-service-host.json"); err != nil {
+					log.Info("No files to migrate")
+					return
+				}
+			}
+		}
+	}
+
 	original := GetDataPath() + "original\\"
 
-	err := os.MkdirAll(GetDataPath()+"original", 0755)
+	stat, err := os.Stat(GetDataPath() + "original")
+	if err == nil && stat.IsDir() {
+		log.Info("Original directory already exists, skipping migration")
+		return
+	}
+
+	err = os.MkdirAll(GetDataPath()+"original", 0755)
 	if err != nil {
 		log.Error("Failed to create original directory: ", err)
 	}
@@ -27,11 +44,26 @@ func Migrate() {
 	err = Copy(original+"nettica.json", GetDataPath()+"nettica.json")
 	if err != nil {
 		log.Error("Failed to copy nettica.json: ", err)
+	} else {
+		err = os.Remove(GetDataPath() + "nettica.json")
+		if err != nil {
+			log.Error("Failed to remove nettica.json: ", err)
+		}
+	}
+
+	err = Copy(original+"keys.json", GetDataPath()+"keys.json")
+	if err != nil {
+		log.Error("Failed to copy keys.json: ", err)
 	}
 
 	err = Copy(original+"nettica.conf", GetDataPath()+"nettica.conf")
 	if err != nil {
 		log.Error("Failed to copy nettica.conf: ", err)
+	} else {
+		err = os.Remove(GetDataPath() + "nettica.conf")
+		if err != nil {
+			log.Error("Failed to remove nettica.conf: ", err)
+		}
 	}
 
 	err = Copy(original+"nettica-service-host.json", GetDataPath()+"nettica-service-host.json")
@@ -49,6 +81,11 @@ func Migrate() {
 	err = os.Rename(GetDataPath()+"nettica-service-host.json", GetDataPath()+"my.nettica.com-service-host.json")
 	if err != nil {
 		log.Error("Failed to rename nettica-service-host.json: ", err)
+	}
+
+	err = os.Rename(GetDataPath()+"keys.json", GetDataPath()+"keys.keys")
+	if err != nil {
+		log.Error("Failed to rename keys.json: ", err)
 	}
 
 	log.Info("*** Migrate Done ***")

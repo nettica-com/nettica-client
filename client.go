@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"slices"
 	"strings"
 	"time"
 
@@ -40,10 +39,17 @@ var (
 	netticaVPNUpdateAPIFmt    = "%s/api/v1.0/vpn/%s"
 )
 
-// Start the channel that iterates the nettica update function
-func StartChannel(c chan []byte) {
+// Client is the main client object
+type Worker struct {
+	// Context is the server context
+	Context *Server `json:"context"`
+	client  *http.Client
+}
 
-	log.Infof("StartChannel Nettica Host %s", device.Server)
+// Start the channel that iterates the nettica update function
+func (w Worker) StartServer() {
+
+	log.Infof("StartServer Nettica Host %s", w.Context.Config.Device.Server)
 	etag := ""
 	success := true
 	var err error
@@ -53,9 +59,10 @@ func StartChannel(c chan []byte) {
 	}
 
 	for {
-		content := <-c
-		if content == nil {
-			break
+		tick := <-w.Context.Running
+
+		if !tick {
+			return
 		}
 
 		ip, err := GetLocalIP()
@@ -68,7 +75,7 @@ func StartChannel(c chan []byte) {
 			localIP = ip
 		}
 
-		etag, err = GetNetticaVPN(etag)
+		etag, err = w.GetNetticaVPN(etag)
 		if err != nil {
 			log.Errorf("Error getting nettica device: %v", err)
 			success = false
@@ -76,7 +83,7 @@ func StartChannel(c chan []byte) {
 			if Count > 3 {
 				FailSafe = true
 				log.Info("FailSafe mode enabled.")
-				Failsafe()
+				w.Failsafe()
 			}
 		} else {
 			if !success && !Bounce {
@@ -98,12 +105,12 @@ func StartChannel(c chan []byte) {
 	}
 }
 
-func Failsafe() error {
+func (w Worker) Failsafe() error {
 
-	file, err := os.Open(GetDataPath() + "nettica.json")
+	file, err := os.Open(w.Context.Path)
 
 	if err != nil {
-		log.Errorf("Error opening nettica.json file %v", err)
+		log.Errorf("Error opening file %s %v", w.Context.Path, err)
 		return err
 	}
 	conf, err := io.ReadAll(file)
@@ -113,7 +120,7 @@ func Failsafe() error {
 		return err
 	}
 
-	UpdateNetticaConfig(conf)
+	w.UpdateNetticaConfig(conf)
 
 	return err
 }
@@ -135,10 +142,10 @@ func GetLocalIP() (string, error) {
 	return ip, err
 }
 
-func DiscoverDevice(device *model.Device) {
+func (w Worker) DiscoverDevice() {
 
 	// don't do anything if the device is configured
-	if device.Registered {
+	if w.Context.Config.Device.Registered {
 		return
 	}
 
@@ -168,8 +175,8 @@ func DiscoverDevice(device *model.Device) {
 					if err == nil && rsp.StatusCode == 200 {
 						body, err := io.ReadAll(rsp.Body)
 						if err == nil {
-							device.InstanceID = string(body)
-							log.Infof("AWS Instance ID: %s", device.InstanceID)
+							w.Context.Config.Device.InstanceID = string(body)
+							log.Infof("AWS Instance ID: %s", w.Context.Config.Device.InstanceID)
 						}
 						rsp.Body.Close()
 						found = true
@@ -195,8 +202,8 @@ func DiscoverDevice(device *model.Device) {
 			if err == nil && rsp.StatusCode == 200 {
 				body, err := io.ReadAll(rsp.Body)
 				if err == nil {
-					device.InstanceID = string(body)
-					log.Infof("Azure Instance ID: %s", device.InstanceID)
+					w.Context.Config.Device.InstanceID = string(body)
+					log.Infof("Azure Instance ID: %s", w.Context.Config.Device.InstanceID)
 				}
 				rsp.Body.Close()
 				found = true
@@ -215,8 +222,8 @@ func DiscoverDevice(device *model.Device) {
 			if err == nil && rsp.StatusCode == 200 {
 				body, err := io.ReadAll(rsp.Body)
 				if err == nil {
-					device.InstanceID = string(body)
-					log.Infof("Oracle Instance ID: %s", device.InstanceID)
+					w.Context.Config.Device.InstanceID = string(body)
+					log.Infof("Oracle Instance ID: %s", w.Context.Config.Device.InstanceID)
 				}
 				rsp.Body.Close()
 				found = true
@@ -225,34 +232,34 @@ func DiscoverDevice(device *model.Device) {
 	}
 
 	if found {
-		saveConfig()
+		SaveServer(w.Context)
 	}
 
 }
 
-var client *http.Client
+func (w Worker) CallNettica(etag *string) ([]byte, error) {
 
-func CallNettica(etag *string) ([]byte, error) {
+	server := w.Context.Config.Device.Server
 
-	server := device.Server
-
-	if !device.Registered && (device.InstanceID != "" || device.EZCode != "") {
-		if strings.HasPrefix(device.EZCode, "ez-") {
-			device.Id = device.EZCode
+	if !w.Context.Config.Device.Registered && (w.Context.Config.Device.InstanceID != "" || w.Context.Config.Device.EZCode != "") {
+		if strings.HasPrefix(w.Context.Config.Device.EZCode, "ez-") {
+			w.Context.Config.Device.Id = w.Context.Config.Device.EZCode
 		} else {
-			device.Id = "device-id-" + device.InstanceID
+			w.Context.Config.Device.Id = "device-id-" + w.Context.Config.Device.InstanceID
 		}
-		if device.Server == "" {
-			device.Server = "https://my.nettica.com"
+		if w.Context.Config.Device.Server == "" {
+			w.Context.Config.Device.Server = "https://my.nettica.com"
 		}
-	} else if device.Server == "" || device.ApiKey == "" || device.Id == "" {
+	} else if w.Context.Config.Device.Server == "" ||
+		w.Context.Config.Device.ApiKey == "" ||
+		w.Context.Config.Device.Id == "" {
 		// don't do anything if the device is not configured
 		return nil, fmt.Errorf("no device configuration")
 	}
 
-	if client == nil {
+	if w.client == nil {
 		if strings.HasPrefix(server, "http:") {
-			client = &http.Client{
+			w.client = &http.Client{
 				Timeout: time.Second * 10,
 			}
 		} else {
@@ -266,20 +273,24 @@ func CallNettica(etag *string) ([]byte, error) {
 				}).Dial,
 				TLSHandshakeTimeout: 10 * time.Second,
 			}
-			client = &http.Client{
+			w.client = &http.Client{
 				Transport: transport,
 			}
 
 		}
 	}
 
-	answer, err := net.LookupIP("my.nettica.com")
+	host := server
+	host = strings.Replace(host, "https://", "", -1)
+	host = strings.Replace(host, "http://", "", -1)
+
+	answer, err := net.LookupIP(host)
 	if err != nil {
-		log.Errorf("DNS lookup for my.nettica.com failed: %v", err)
+		log.Errorf("DNS lookup for %s failed: %v", host, err)
 	}
 
-	var reqURL string = fmt.Sprintf(netticaDeviceStatusAPIFmt, server, device.Id)
-	if !device.Quiet {
+	var reqURL string = fmt.Sprintf(netticaDeviceStatusAPIFmt, server, w.Context.Config.Device.Id)
+	if !w.Context.Config.Device.Quiet {
 		s := "NXDOMAIN"
 		if len(answer) > 0 {
 			s = answer[0].String()
@@ -295,23 +306,20 @@ func CallNettica(etag *string) ([]byte, error) {
 
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
 	if err != nil {
-		client = nil
 		return nil, err
 	}
 	if req != nil {
-		req.Header.Set("X-API-KEY", device.ApiKey)
+		req.Header.Set("X-API-KEY", w.Context.Config.Device.ApiKey)
 		req.Header.Set("User-Agent", "nettica-client/"+Version)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("If-None-Match", *etag)
 	}
-	resp, err := client.Do(req)
+
+	resp, err := w.client.Do(req)
 	if err == nil {
 		if resp.StatusCode == 304 {
-			buffer, err := os.ReadFile(GetDataPath() + "nettica.json")
-			if err == nil {
-				return buffer, nil
-			}
-
+			buffer := w.Context.Body
+			return buffer, nil
 		} else if resp.StatusCode == 401 {
 			return nil, fmt.Errorf("Unauthorized")
 		} else if resp.StatusCode == 404 {
@@ -338,14 +346,13 @@ func CallNettica(etag *string) ([]byte, error) {
 		}
 	} else {
 		log.Errorf("ERROR: %v, continuing", err)
-		client = nil
 	}
 
 	return nil, err
 
 }
 
-func GetNetticaDevice() (*model.Device, error) {
+func (w Worker) GetNetticaDevice() (*model.Device, error) {
 
 	if !cfg.loaded {
 		err := loadConfig()
@@ -354,7 +361,7 @@ func GetNetticaDevice() (*model.Device, error) {
 		}
 	}
 
-	server := device.Server
+	server := w.Context.Config.Device.Server
 	var client *http.Client
 
 	if strings.HasPrefix(server, "http:") {
@@ -378,8 +385,8 @@ func GetNetticaDevice() (*model.Device, error) {
 
 	}
 
-	var reqURL string = fmt.Sprintf(netticaDeviceAPIFmt, server, device.Id)
-	if !device.Quiet {
+	var reqURL string = fmt.Sprintf(netticaDeviceAPIFmt, server, w.Context.Config.Device.Id)
+	if !w.Context.Config.Device.Quiet {
 		log.Infof("  GET %s", reqURL)
 	}
 
@@ -392,7 +399,7 @@ func GetNetticaDevice() (*model.Device, error) {
 		return nil, err
 	}
 	if req != nil {
-		req.Header.Set("X-API-KEY", device.ApiKey)
+		req.Header.Set("X-API-KEY", w.Context.Config.Device.ApiKey)
 		req.Header.Set("User-Agent", "nettica-client/"+Version)
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -427,11 +434,11 @@ func GetNetticaDevice() (*model.Device, error) {
 	return nil, err
 }
 
-func DeleteVPN(id string) error {
+func (w Worker) DeleteDevice(id string) error {
 
 	var client *http.Client
 
-	if strings.HasPrefix(device.Server, "http:") {
+	if strings.HasPrefix(w.Context.Config.Device.Server, "http:") {
 		client = &http.Client{
 			Timeout: time.Second * 10,
 		}
@@ -452,8 +459,8 @@ func DeleteVPN(id string) error {
 
 	}
 
-	var reqURL string = fmt.Sprintf(netticaVPNUpdateAPIFmt, device.Server, id)
-	if !device.Quiet {
+	var reqURL string = fmt.Sprintf(netticaDeviceAPIFmt, w.Context.Config.Device.Server, id)
+	if !w.Context.Config.Device.Quiet {
 		log.Infof("  DELETE %s", reqURL)
 	}
 
@@ -466,7 +473,75 @@ func DeleteVPN(id string) error {
 		return err
 	}
 	if req != nil {
-		req.Header.Set("X-API-KEY", device.ApiKey)
+		req.Header.Set("X-API-KEY", w.Context.Config.Device.ApiKey)
+		req.Header.Set("User-Agent", "nettica-client/"+Version)
+		req.Header.Set("Content-Type", "application/json")
+	}
+	resp, err := client.Do(req)
+	if err == nil {
+		if resp.StatusCode == 401 {
+			return fmt.Errorf("Unauthorized")
+		} else if resp.StatusCode != 200 {
+			log.Errorf("Response Error Code: %v", resp.StatusCode)
+			return fmt.Errorf("response error code: %v", resp.StatusCode)
+		} else {
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				log.Errorf("error reading body %v", err)
+			}
+			log.Debugf("%s", string(body))
+			resp.Body.Close()
+
+			return nil
+		}
+	} else {
+		log.Errorf("DELETE ERROR: %v", err)
+	}
+
+	return err
+
+}
+
+func (w Worker) DeleteVPN(id string) error {
+
+	var client *http.Client
+
+	if strings.HasPrefix(w.Context.Config.Device.Server, "http:") {
+		client = &http.Client{
+			Timeout: time.Second * 10,
+		}
+	} else {
+		// Create a transport like http.DefaultTransport, but with the configured LocalAddr
+		transport := &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			Dial: (&net.Dialer{
+				Timeout:   5 * time.Second,
+				KeepAlive: 60 * time.Second,
+				LocalAddr: cfg.sourceAddr,
+			}).Dial,
+			TLSHandshakeTimeout: 10 * time.Second,
+		}
+		client = &http.Client{
+			Transport: transport,
+		}
+
+	}
+
+	var reqURL string = fmt.Sprintf(netticaVPNUpdateAPIFmt, w.Context.Config.Device.Server, id)
+	if !w.Context.Config.Device.Quiet {
+		log.Infof("  DELETE %s", reqURL)
+	}
+
+	// Create a context with a 15 second timeout
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(15*time.Second))
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "DELETE", reqURL, nil)
+	if err != nil {
+		return err
+	}
+	if req != nil {
+		req.Header.Set("X-API-KEY", w.Context.Config.Device.ApiKey)
 		req.Header.Set("User-Agent", "nettica-client/"+Version)
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -495,15 +570,15 @@ func DeleteVPN(id string) error {
 
 }
 
-func UpdateNetticaDevice(d model.Device) error {
+func (w Worker) UpdateNetticaDevice(d model.Device) error {
 
 	log.Infof("UPDATING DEVICE: %v", d)
 
-	if device.Server == "" || device.AccountID == "" || device.ApiKey == "" || device.Id == "" {
+	if w.Context.Config.Device.Server == "" || w.Context.Config.Device.AccountID == "" || w.Context.Config.Device.ApiKey == "" || w.Context.Config.Device.Id == "" {
 		return errors.New("skipping update, not enough information.  waiting for server to update us")
 	}
 
-	server := device.Server
+	server := w.Context.Config.Device.Server
 	var client *http.Client
 
 	if strings.HasPrefix(server, "http:") {
@@ -543,7 +618,7 @@ func UpdateNetticaDevice(d model.Device) error {
 		return err
 	}
 	if req != nil {
-		req.Header.Set("X-API-KEY", device.ApiKey)
+		req.Header.Set("X-API-KEY", w.Context.Config.Device.ApiKey)
 		req.Header.Set("User-Agent", "nettica-client/"+Version)
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -571,7 +646,7 @@ func UpdateNetticaDevice(d model.Device) error {
 	return nil
 }
 
-func GetNetticaVPN(etag string) (string, error) {
+func (w Worker) GetNetticaVPN(etag string) (string, error) {
 
 	if !cfg.loaded {
 		err := loadConfig()
@@ -580,16 +655,19 @@ func GetNetticaVPN(etag string) (string, error) {
 		}
 	}
 
-	body, err := CallNettica(&etag)
+	body, err := w.CallNettica(&etag)
 	if err != nil {
-		client = nil
+		w.client = nil
 		if err.Error() == "Unauthorized" {
 			log.Errorf("Unauthorized - reload config")
 			// Read the config and find another API key
 			// pick up any changes from the agent or manually editing the config file.
-			reloadConfig()
 		} else if err.Error() == "not found" {
 			log.Errorf("Device not found")
+			// Device not found, delete it and shutdown this thread
+			// Notify the user
+			NotifyInfo("Device not found.  Removing device from configuration.")
+			RemoveServer(w.Context)
 		} else {
 			log.Error(err)
 		}
@@ -601,17 +679,17 @@ func GetNetticaVPN(etag string) (string, error) {
 			FailSafeMsgSent = false
 			Count = 0
 		}
-		UpdateNetticaConfig(body)
+		w.UpdateNetticaConfig(body)
 		return etag, nil
 	}
 
 	return "", err
 }
 
-func UpdateVPN(vpn *model.VPN) error {
+func (w Worker) UpdateVPN(vpn *model.VPN) error {
 
 	log.Infof(" ******************** UPDATING VPN: %s ********************", vpn.Name)
-	server := device.Server
+	server := w.Context.Config.Device.Server
 	var client *http.Client
 
 	if strings.HasPrefix(server, "http:") {
@@ -651,7 +729,7 @@ func UpdateVPN(vpn *model.VPN) error {
 		return err
 	}
 	if req != nil {
-		req.Header.Set("X-API-KEY", device.ApiKey)
+		req.Header.Set("X-API-KEY", w.Context.Config.Device.ApiKey)
 		req.Header.Set("User-Agent", "nettica-client/"+Version)
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -680,32 +758,21 @@ func UpdateVPN(vpn *model.VPN) error {
 }
 
 // UpdateNetticaConfig updates the config from the server
-func UpdateNetticaConfig(body []byte) {
+func (w Worker) UpdateNetticaConfig(body []byte) {
 
 	defer func() {
 		Bounce = false
 	}()
 
 	// If the file doesn't exist create it for the first time
-	if _, err := os.Stat(GetDataPath() + "nettica.json"); os.IsNotExist(err) {
-		file, err := os.OpenFile(GetDataPath()+"nettica.json", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+	if _, err := os.Stat(w.Context.Path); os.IsNotExist(err) {
+		file, err := os.OpenFile(w.Context.Path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 		if err == nil {
 			file.Close()
 		}
 	}
 
-	file, err := os.Open(GetDataPath() + "nettica.json")
-
-	if err != nil {
-		log.Errorf("Error opening nettica.json file %v", err)
-		return
-	}
-	conf, err := io.ReadAll(file)
-	file.Close()
-	if err != nil {
-		log.Errorf("Error reading nettica config file: %v", err)
-		return
-	}
+	conf := w.Context.Body
 
 	// compare the body to the current config and make no changes if they are the same
 	if bytes.Equal(conf, body) && !Bounce && !FailSafe {
@@ -719,11 +786,11 @@ func UpdateNetticaConfig(body []byte) {
 			log.Info("FailSafe!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 		}
 
-		log.Info("Config has changed, updating nettica.json")
+		log.Info("Config has changed, updating context")
 
 		// if we can't read the message, immediately return
 		var msg model.Message
-		err = json.Unmarshal(body, &msg)
+		err := json.Unmarshal(body, &msg)
 		if err != nil {
 			log.Errorf("Error reading message from server")
 			return
@@ -731,24 +798,17 @@ func UpdateNetticaConfig(body []byte) {
 
 		// If this is a ServiceHost, validate the message before proceeding
 		if ServiceHost {
-			err := ValidateMessage(&msg)
+			err := w.ValidateMessage(&msg)
 			if err != nil {
 				log.Errorf("Error validating message: %v", err)
 				return
 			}
 		}
 
-		file, err := os.OpenFile(GetDataPath()+"nettica.json", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
-		if err != nil {
-			log.Errorf("Error opening nettica.json for write: %v", err)
-			return
-		}
-		_, err = file.Write(body)
-		file.Close()
-		if err != nil {
-			log.Infof("Error writing nettica.json file: %v", err)
-			return
-		}
+		// Update the Server Config / Context with this new message
+		w.Context.Config = msg
+		w.Context.Body = body
+		SaveServer(w.Context)
 
 		var oldconf model.Message
 		err = json.Unmarshal(conf, &oldconf)
@@ -766,61 +826,18 @@ func UpdateNetticaConfig(body []byte) {
 				log.Errorf("Stopping %s", msg.Config[i].NetName)
 				StopWireguard(msg.Config[i].NetName)
 			}
-			MergeDevices(msg.Device, &device)
-			saveConfig()
 			return
 		}
 
-		if msg.Device.Quiet != device.Quiet {
-			log.Errorf("Quiet has changed, new quiet is %t", msg.Device.Quiet)
-			device.Quiet = msg.Device.Quiet
-			saveConfig()
-		}
-
-		if (msg.Device.CheckInterval != 0) && (msg.Device.CheckInterval != device.CheckInterval) {
-			log.Infof("CheckInterval has changed, new interval is %d", msg.Device.CheckInterval)
-			device.CheckInterval = msg.Device.CheckInterval
-			saveConfig()
-		}
-
-		if msg.Device.Description != device.Description {
-			log.Infof("Description has changed, new description is %s", msg.Device.Description)
-			device.Description = msg.Device.Description
-			saveConfig()
-		}
-
-		if !slices.Equal(msg.Device.Tags, device.Tags) {
-			log.Infof("Tags have changed, new tags are %v", msg.Device.Tags)
-			device.Tags = msg.Device.Tags
-			saveConfig()
-		}
-
-		if msg.Device.Server != device.Server {
-			log.Infof("Server has changed, new server is %s", msg.Device.Server)
-			device.Server = msg.Device.Server
-			saveConfig()
-		}
-
 		// One-Time discovery of the device
-		if device.ApiKey == "" && msg.Device.ApiKey != "" {
+		// check on this in the new world order
+		/*if w.Context.Config.Device.ApiKey == "" && msg.Device.ApiKey != "" {
 			log.Infof("Device is not registered, registering")
 			device.ApiKey = msg.Device.ApiKey
 			device.Id = msg.Device.Id
 			device.Registered = true
 			saveConfig()
-		}
-
-		if (msg.Device.Name != "") && (msg.Device.Name != device.Name) &&
-			msg.Device.Updated.After(device.Updated) {
-			log.Infof("Name has changed, new name is %s", msg.Device.Name)
-			device.Name = msg.Device.Name
-			saveConfig()
-		}
-
-		if msg.Device.AccountID != "" && msg.Device.AccountID != device.AccountID {
-			device.AccountID = msg.Device.AccountID
-			saveConfig()
-		}
+		}*/
 
 		// make a copy of the message since UpdateDNS will alter it.
 		var msg2 model.Message
@@ -841,7 +858,7 @@ func UpdateNetticaConfig(body []byte) {
 				os.Remove(GetDataPath() + oldconf.Config[i].NetName + ".conf")
 
 				for _, vpn := range oldconf.Config[i].VPNs {
-					if vpn.DeviceID == device.Id {
+					if vpn.DeviceID == w.Context.Config.Device.Id {
 						KeyDelete(vpn.Current.PublicKey)
 						KeySave()
 					}
@@ -883,7 +900,7 @@ func UpdateNetticaConfig(body []byte) {
 			index := -1
 			// find our VPN in the configuration
 			for j := 0; j < len(msg.Config[i].VPNs); j++ {
-				if msg.Config[i].VPNs[j].DeviceID == device.Id {
+				if msg.Config[i].VPNs[j].DeviceID == w.Context.Config.Device.Id {
 					index = j
 					break
 				}
@@ -903,19 +920,16 @@ func UpdateNetticaConfig(body []byte) {
 				if err != nil {
 					log.Errorf("GetLocalSubnets, err = %v", err)
 				}
-				log.Errorf("Subnets: %v", subnets)
 
 				// Iterate through this VPN's addresses and remove any subnets that match
 				// What should be left is the subnets that are local to this device
 				for k := 0; k < len(vpn.Current.Address); k++ {
 					network, err := GetNetworkAddress(vpn.Current.Address[k])
 					if err != nil {
-						log.Errorf("GetNetworkAddress, err = %v", err)
 						continue
 					}
 					for l := 0; l < len(subnets); l++ {
 						if subnets[l].String() == network {
-							log.Errorf("From Local: Removing subnet %s from %s", subnets[l].String(), vpn.Name)
 							subnets = append(subnets[:l], subnets[l+1:]...)
 						}
 					}
@@ -932,12 +946,10 @@ func UpdateNetticaConfig(body []byte) {
 						}
 						_, s, err := net.ParseCIDR(allowed[l])
 						if err != nil {
-							log.Errorf("net.ParseCIDR err = %v", err)
 							continue
 						}
 						for _, subnet := range subnets {
 							if subnet.Contains(s.IP) {
-								log.Errorf("From Foreign: Removing subnet %s from %s", allowed[l], vpn.Name)
 								inSubnet = true
 							}
 						}
@@ -956,11 +968,11 @@ func UpdateNetticaConfig(body []byte) {
 						log.Errorf("Error saving key: %s %s", vpn.Current.PublicKey, vpn.Current.PrivateKey)
 					}
 
-					if device.UpdateKeys {
+					if w.Context.Config.Device.UpdateKeys {
 						// clear out the private key and update the server
 						vpn2 := vpn
 						vpn2.Current.PrivateKey = ""
-						UpdateVPN(&vpn2)
+						w.UpdateVPN(&vpn2)
 					}
 
 					key, _ = KeyLookup(vpn.Current.PublicKey)
@@ -980,7 +992,7 @@ func UpdateNetticaConfig(body []byte) {
 					vpn2.Current.PrivateKey = ""
 
 					// Update nettica with the new public key
-					UpdateVPN(&vpn2)
+					w.UpdateVPN(&vpn2)
 
 				} else {
 					vpn.Current.PrivateKey = key
@@ -1055,7 +1067,7 @@ func UpdateNetticaConfig(body []byte) {
 						vpn.Failover = FAILOVER
 
 						// Update the server with any luck
-						if err = UpdateVPN(&vpn); err != nil {
+						if err = w.UpdateVPN(&vpn); err != nil {
 							log.Errorf("Error updating VPN: %v", err)
 						}
 					} else {
@@ -1169,7 +1181,7 @@ func UpdateNetticaConfig(body []byte) {
 // 4. The Type of VPN is set to Service
 // 5. The overall Device and VPN conform to their models
 // This will allow the host to be used in the wild without fear of exploitation
-func ValidateMessage(msg *model.Message) error {
+func (w Worker) ValidateMessage(msg *model.Message) error {
 
 	if !ServiceHost {
 		return nil
@@ -1236,25 +1248,13 @@ func ValidateMessage(msg *model.Message) error {
 	return nil
 }
 
-func FindVPN(net string) (*model.VPN, *[]model.VPN, error) {
-
-	file, err := os.Open(GetDataPath() + "nettica.json")
-
-	if err != nil {
-		log.Errorf("Error opening nettica.json file %v", err)
-		return nil, nil, err
-	}
-	conf, err := io.ReadAll(file)
-	file.Close()
-	if err != nil {
-		log.Errorf("Error reading nettica config file: %v", err)
-		return nil, nil, err
-	}
+func (w Worker) FindVPN(net string) (*model.VPN, *[]model.VPN, error) {
 
 	var msg model.Message
-	err = json.Unmarshal(conf, &msg)
+	err := json.Unmarshal(w.Context.Body, &msg)
+
 	if err != nil {
-		log.Errorf("Error reading message from config file")
+		log.Errorf("Error reading message from context")
 		return nil, nil, err
 	}
 
@@ -1262,7 +1262,7 @@ func FindVPN(net string) (*model.VPN, *[]model.VPN, error) {
 		if msg.Config[i].NetName == net {
 			log.Infof("Found net %s", net)
 			for j := 0; j < len(msg.Config[i].VPNs); j++ {
-				if msg.Config[i].VPNs[j].DeviceID == device.Id {
+				if msg.Config[i].VPNs[j].DeviceID == w.Context.Config.Device.Id {
 					log.Infof("Found VPN %v", msg.Config[i].VPNs[j])
 					return &msg.Config[i].VPNs[j], &msg.Config[i].VPNs, nil
 				}
@@ -1274,25 +1274,37 @@ func FindVPN(net string) (*model.VPN, *[]model.VPN, error) {
 
 }
 
-func StopAllVPNs() error {
+func (w Worker) FindVPNById(id string) (*model.VPN, *[]model.VPN, error) {
+
+	var msg model.Message
+	err := json.Unmarshal(w.Context.Body, &msg)
+
+	if err != nil {
+		log.Errorf("Error reading message from context")
+		return nil, nil, err
+	}
+
+	for i := 0; i < len(msg.Config); i++ {
+		for j := 0; j < len(msg.Config[i].VPNs); j++ {
+			if msg.Config[i].VPNs[j].Id == id {
+				log.Infof("Found VPN %v", msg.Config[i].VPNs[j])
+				return &msg.Config[i].VPNs[j], &msg.Config[i].VPNs, nil
+			}
+		}
+	}
+
+	return nil, nil, fmt.Errorf("VPN not found")
+
+}
+
+func (w Worker) StopAllVPNs() error {
 
 	log.Infof(" ******************** STOPPING ALL VPNS ********************")
 
-	file, err := os.Open(GetDataPath() + "nettica.json")
-
-	if err != nil {
-		log.Errorf("Error opening nettica.json file %v", err)
-		return err
-	}
-	conf, err := io.ReadAll(file)
-	file.Close()
-	if err != nil {
-		log.Errorf("Error reading nettica config file: %v", err)
-		return err
-	}
-
 	var msg model.Message
-	err = json.Unmarshal(conf, &msg)
+
+	conf := w.Context.Body
+	err := json.Unmarshal(conf, &msg)
 	if err != nil {
 		log.Errorf("Error reading message from config file")
 		return err
@@ -1301,7 +1313,7 @@ func StopAllVPNs() error {
 	for i := 0; i < len(msg.Config); i++ {
 		index := -1
 		for j := 0; j < len(msg.Config[i].VPNs); j++ {
-			if msg.Config[i].VPNs[j].DeviceID == device.Id {
+			if msg.Config[i].VPNs[j].DeviceID == w.Context.Config.Device.Id {
 				index = j
 				break
 			}
@@ -1318,7 +1330,7 @@ func StopAllVPNs() error {
 			if vpn.Enable {
 				log.Infof(" >>>>>>>>>> Stopping VPN %s <<<<<<<<<<", vpn.NetName)
 				vpn.Enable = false
-				err = UpdateVPN(&vpn)
+				err = w.UpdateVPN(&vpn)
 				if err != nil {
 					log.Errorf("Error disabling VPN %v", vpn.NetName)
 				}
@@ -1337,23 +1349,15 @@ func StopAllVPNs() error {
 		return err
 	}
 
-	file, err = os.OpenFile(GetDataPath()+"nettica.json", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
-	if err != nil {
-		log.Errorf("Error opening nettica.json for write: %v", err)
-		return nil
-	}
-	_, err = file.Write(body)
-	file.Close()
-	if err != nil {
-		log.Infof("Error writing nettica.json file: %v", err)
-		return nil
-	}
+	w.Context.Config = msg
+	w.Context.Body = body
+	SaveServer(w.Context)
 
 	return nil
 }
 
 // This needs to be refactored with the main logic above
-func StartBackgroundRefreshService() {
+func (w Worker) StartBackgroundRefreshService() {
 
 	// Wait for the main thread to contact Nettica at least once before starting up the VPNs
 	// on a reboot
@@ -1362,19 +1366,8 @@ func StartBackgroundRefreshService() {
 
 	for {
 
-		file, err := os.Open(GetDataPath() + "nettica.json")
-		if err != nil {
-			log.Errorf("Error opening nettica.json for read: %v", err)
-			return
-		}
-		bytes, err := io.ReadAll(file)
-		file.Close()
-		if err != nil {
-			log.Errorf("Error reading nettica config file: %v", err)
-			return
-		}
 		var msg model.Message
-		err = json.Unmarshal(bytes, &msg)
+		err := json.Unmarshal(w.Context.Body, &msg)
 		if err != nil {
 			log.Errorf("Error reading message from server")
 		}
@@ -1387,15 +1380,13 @@ func StartBackgroundRefreshService() {
 			for i := 0; i < len(msg.Config); i++ {
 				StopWireguard(msg.Config[i].NetName)
 			}
-			MergeDevices(msg.Device, &device)
-			saveConfig()
 			return
 		}
 
 		for i := 0; i < len(msg.Config); i++ {
 			index := -1
 			for j := 0; j < len(msg.Config[i].VPNs); j++ {
-				if msg.Config[i].VPNs[j].DeviceID == device.Id {
+				if msg.Config[i].VPNs[j].DeviceID == w.Context.Config.Device.Id {
 					index = j
 					break
 				}
@@ -1484,7 +1475,7 @@ func StartBackgroundRefreshService() {
 					vpn2.Current.PrivateKey = ""
 
 					// Update nettica with the new public key
-					UpdateVPN(&vpn2)
+					w.UpdateVPN(&vpn2)
 
 				} else {
 					vpn.Current.PrivateKey = key
@@ -1536,9 +1527,8 @@ func StartBackgroundRefreshService() {
 	}
 }
 
-// DoWork error handler
+// DoWork handler
 func DoWork() {
-	var curTs int64
 
 	// recover from any panics coming from below
 	defer func() {
@@ -1555,32 +1545,48 @@ func DoWork() {
 
 		// Determine current timestamp (the wallclock time we'll retrieve files using)
 
-		c := make(chan []byte)
 		go startHTTPd()
-		go StartChannel(c)
 		go StartDNS()
-		go StartBackgroundRefreshService()
 
-		curTs = calculateCurrentTimestamp()
+		err := LoadServers()
+		if err != nil {
+			log.Errorf("Error loading servers: %v", err)
+		}
 
-		t := time.Unix(curTs, 0)
-		log.Infof("current timestamp = %v (%s)", curTs, t.UTC())
+		for _, s := range Servers {
 
-		for {
-			time.Sleep(1000 * time.Millisecond)
-			ts := time.Now()
+			go func(s *Server) {
 
-			if ts.Unix() >= curTs {
+				//log.Infof("Server: %v", s)
+				var curTs int64
 
-				b := []byte("")
+				w := Worker{Context: s}
+				s.Worker = &w
 
-				c <- b
+				go w.StartServer()
+				go DoServiceWork(s)
 
 				curTs = calculateCurrentTimestamp()
-				curTs += device.CheckInterval
-			}
 
+				t := time.Unix(curTs, 0)
+				log.Infof("current timestamp = %v (%s)", curTs, t.UTC())
+
+				for {
+					time.Sleep(1000 * time.Millisecond)
+					ts := time.Now()
+
+					if ts.Unix() >= curTs {
+
+						w.Context.Running <- true
+
+						curTs = calculateCurrentTimestamp()
+						curTs += w.Context.Config.Device.CheckInterval
+					}
+				}
+
+			}(s)
 		}
+
 	}()
 }
 

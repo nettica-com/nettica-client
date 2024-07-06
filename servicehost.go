@@ -18,15 +18,14 @@ import (
 var netticaServiceHostAPIFmt = "%s/api/v1.0/service/%s/status"
 var netticaServiceHostUpdateAPIFmt = "%s/api/v1.0/service/%s"
 
-// StartHTTPClient starts the client polling
-func StartServiceHost(c chan []byte) {
-	host := device.Server
+func StartServiceHost(s *Server, c chan bool) {
+	host := s.Config.Device.Server
 	var client *http.Client
 	var etag string
 
-	err := StartContainers()
+	err := StartContainers(s)
 	if err != nil {
-		if !device.Quiet {
+		if !s.Config.Device.Quiet {
 			log.Errorf("Error starting containers %v", err)
 		}
 	}
@@ -53,7 +52,7 @@ func StartServiceHost(c chan []byte) {
 	}
 
 	for {
-		content := <-c
+		<-c
 		if !cfg.loaded {
 			err := loadConfig()
 			if err != nil {
@@ -62,18 +61,19 @@ func StartServiceHost(c chan []byte) {
 		}
 
 		// Only make API call if ServiceGroup is set
-		if device.ServiceGroup != "" && device.ServiceApiKey != "" {
-			var reqURL string = fmt.Sprintf(netticaServiceHostAPIFmt, host, device.ServiceGroup)
-			if !device.Quiet {
+		if s.Config.Device.ServiceGroup != "" && s.Config.Device.ServiceApiKey != "" {
+			var reqURL string = fmt.Sprintf(netticaServiceHostAPIFmt, host, s.Config.Device.ServiceGroup)
+			if !s.Config.Device.Quiet {
 				log.Infof("  GET %s", reqURL)
 			}
 
-			req, err := http.NewRequest("GET", reqURL, bytes.NewBuffer(content))
+			var buffer []byte
+			req, err := http.NewRequest("GET", reqURL, bytes.NewBuffer(buffer))
 			if err != nil {
 				return
 			}
 			if req != nil {
-				req.Header.Set("X-API-KEY", device.ServiceApiKey)
+				req.Header.Set("X-API-KEY", s.Config.Device.ServiceApiKey)
 				req.Header.Set("User-Agent", "nettica-client/2.0")
 				req.Header.Set("Content-Type", "application/json")
 				req.Header.Set("If-None-Match", etag)
@@ -92,7 +92,7 @@ func StartServiceHost(c chan []byte) {
 					}
 					log.Debugf("%s", string(body))
 					etag = resp.Header.Get("ETag")
-					UpdateServiceHostConfig(body)
+					UpdateServiceHostConfig(s, body)
 				}
 			} else {
 				log.Errorf("ERROR: %v, sleeping 10 seconds", err)
@@ -109,11 +109,16 @@ func StartServiceHost(c chan []byte) {
 	}
 }
 
-func StartContainers() error {
-	file, err := os.Open(GetDataPath() + "nettica-service-host.json")
+func StartContainers(s *Server) error {
+
+	path := s.Path
+	path = strings.TrimSuffix(path, ".json")
+	path = path + "-server-host.json"
+
+	file, err := os.Open(path)
 
 	if err != nil {
-		if !device.Quiet {
+		if !s.Config.Device.Quiet {
 			log.Errorf("Error opening config file %v", err)
 		}
 		return err
@@ -121,13 +126,13 @@ func StartContainers() error {
 	body, err := io.ReadAll(file)
 	file.Close()
 	if err != nil {
-		log.Errorf("Error reading nettica config file: %v", err)
+		log.Errorf("Error reading service host config file: %v", err)
 		return err
 	}
 	var msg model.ServiceMessage
 	err = json.Unmarshal(body, &msg)
 	if err != nil {
-		log.Errorf("Error unmarshalling nettica config file: %v", err)
+		log.Errorf("Error unmarshalling service host config file: %v", err)
 		return err
 	}
 
@@ -140,7 +145,7 @@ func StartContainers() error {
 			} else {
 				service.ContainerId = id
 				service.Status = "Running"
-				UpdateNetticaServiceHost(service)
+				UpdateNetticaServiceHost(s, service)
 				log.Infof("Started service %s", service.ContainerId)
 			}
 		} else {
@@ -151,7 +156,7 @@ func StartContainers() error {
 				if err == nil {
 					service.ContainerId = id
 					service.Status = "Running"
-					UpdateNetticaServiceHost(service)
+					UpdateNetticaServiceHost(s, service)
 					log.Infof("Restarted service %s", service.ContainerId)
 				}
 			}
@@ -160,10 +165,10 @@ func StartContainers() error {
 	return nil
 }
 
-func UpdateNetticaServiceHost(service model.Service) error {
+func UpdateNetticaServiceHost(s *Server, service model.Service) error {
 
 	log.Infof("UPDATING SERVICE: %v", service)
-	server := device.Server
+	server := s.Config.Device.Server
 	var client *http.Client
 
 	if strings.HasPrefix(server, "http:") {
@@ -228,7 +233,7 @@ func UpdateNetticaServiceHost(service model.Service) error {
 }
 
 // UpdateServiceHostConfig updates the config from the server
-func UpdateServiceHostConfig(body []byte) {
+func UpdateServiceHostConfig(s *Server, body []byte) {
 
 	// If the file doesn't exist create it for the first time
 	if _, err := os.Stat(GetDataPath() + "nettica-service-host.json"); os.IsNotExist(err) {
@@ -291,11 +296,11 @@ func UpdateServiceHostConfig(body []byte) {
 				if err != nil {
 					log.Errorf("Error starting service %v", err)
 					service.Status = "Error"
-					UpdateNetticaServiceHost(service)
+					UpdateNetticaServiceHost(s, service)
 				} else {
 					service.ContainerId = id
 					service.Status = "Running"
-					UpdateNetticaServiceHost(service)
+					UpdateNetticaServiceHost(s, service)
 				}
 			} else {
 				// If the container isn't running (eg, reboot), restart it
@@ -305,11 +310,11 @@ func UpdateServiceHostConfig(body []byte) {
 					if err == nil {
 						service.ContainerId = id
 						service.Status = "Running"
-						UpdateNetticaServiceHost(service)
+						UpdateNetticaServiceHost(s, service)
 					} else {
 						log.Errorf("Error restarting service %v", err)
 						service.Status = "Error"
-						UpdateNetticaServiceHost(service)
+						UpdateNetticaServiceHost(s, service)
 					}
 				}
 			}
@@ -372,7 +377,7 @@ func StopService(service model.Service) {
 }
 
 // DoServiceWork catches any errors in the service and recovers from them, if possible
-func DoServiceWork() {
+func DoServiceWork(s *Server) {
 	var curTs int64
 
 	// recover from any panics coming from below
@@ -390,8 +395,8 @@ func DoServiceWork() {
 
 		// Determine current timestamp (the wallclock time we'll retrieve files using)
 
-		c := make(chan []byte)
-		go StartServiceHost(c)
+		c := make(chan bool)
+		go StartServiceHost(s, c)
 
 		curTs = calculateCurrentTimestamp()
 
@@ -405,11 +410,10 @@ func DoServiceWork() {
 			if ts.Unix() >= curTs {
 
 				// call the channel to trigger the next poll
-				b := []byte("Service")
-				c <- b
+				c <- true
 
 				curTs = calculateCurrentTimestamp()
-				curTs += device.CheckInterval
+				curTs += s.Config.Device.CheckInterval
 			}
 
 		}

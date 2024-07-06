@@ -48,12 +48,12 @@ func KeySave() error {
 	KeyLock.Lock()
 	defer KeyLock.Unlock()
 
-	file, err := os.OpenFile(GetDataPath()+"keys.json", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	file, err := os.OpenFile(GetDataPath()+"keys.keys", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if file != nil {
 		defer file.Close()
 	}
 	if err != nil {
-		log.Errorf("Error opening keys.json for write: %v", err)
+		log.Errorf("Error opening keys.keys for write: %v", err)
 		return err
 	}
 	bytes, err := json.Marshal(KeyStore)
@@ -69,9 +69,9 @@ func KeyLoad() error {
 	KeyLock.Lock()
 	defer KeyLock.Unlock()
 
-	file, err := os.Open(GetDataPath() + "keys.json")
+	file, err := os.Open(GetDataPath() + "keys.keys")
 	if err != nil {
-		log.Errorf("Error opening keys.json for read: %v", err)
+		log.Errorf("Error opening keys.keys for read: %v", err)
 		return err
 	}
 
@@ -79,7 +79,7 @@ func KeyLoad() error {
 	file.Close()
 
 	if err != nil {
-		log.Errorf("Error reading keys.json: %v", err)
+		log.Errorf("Error reading keys.keys: %v", err)
 		return err
 	}
 

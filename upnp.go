@@ -149,3 +149,24 @@ func ConfigureUPnP(vpn model.VPN) error {
 
 	return nil
 }
+
+func UpdateVPN(vpn *model.VPN) error {
+	// Update the vpn at nettica
+
+	for _, s := range Servers {
+		if s.Worker != nil {
+			v, _, err := s.Worker.FindVPN(vpn.NetName)
+			if err != nil {
+				log.Errorf("Error finding vpn: %v", err)
+			}
+			if v != nil {
+				err = s.Worker.UpdateVPN(vpn)
+				if err != nil {
+					log.Errorf("Error updating vpn: %v", err)
+				}
+				return err
+			}
+		}
+	}
+	return nil
+}

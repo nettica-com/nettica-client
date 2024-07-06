@@ -50,10 +50,7 @@ loop:
 				time.Sleep(100 * time.Millisecond)
 				changes <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
-				// golang.org/x/sys/windows/svc.TestExample is verifying this output.
-				testOutput := strings.Join(args, "-")
-				testOutput += fmt.Sprintf("-%d", c.Context)
-				elog.Info(1, testOutput)
+				elog.Info(1, "stopping nettica")
 				break loop
 			case svc.Pause:
 				changes <- svc.Status{State: svc.Paused, Accepts: cmdsAccepted}
