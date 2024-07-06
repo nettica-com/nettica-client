@@ -53,8 +53,8 @@ func Migrate() {
 		err = json.Unmarshal(data, &msg)
 		if err == nil {
 			name := msg.Device.Server
-			name = strings.Replace("https://", "", name, -1)
-			name = strings.Replace("http://", "", name, -1)
+			name = strings.Replace(name, "https://", "", -1)
+			name = strings.Replace(name, "http://", "", -1)
 			err = os.WriteFile(GetDataPath()+name+".json", data, 0644)
 			if err != nil {
 				log.Errorf("Failed to create %s.json: %v", name, err)
