@@ -47,7 +47,7 @@ func loadConfig() error {
 
 		// configure defaults
 		cfg.debug = false
-		cfg.quiet = true
+		cfg.quiet = false
 		cfg.UpdateKeys = true
 
 		// load defaults from environment

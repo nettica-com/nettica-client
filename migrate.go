@@ -51,7 +51,7 @@ func Migrate() {
 		log.Printf("Failed to read file %s: %v", "nettica.json", err)
 	} else {
 		err = json.Unmarshal(data, &msg)
-		if err != nil {
+		if err == nil {
 			name := msg.Device.Server
 			name = strings.Replace("https://", "", name, -1)
 			name = strings.Replace("http://", "", name, -1)
@@ -59,6 +59,8 @@ func Migrate() {
 			if err != nil {
 				log.Errorf("Failed to create %s.json: %v", name, err)
 			}
+		} else {
+			log.Errorf("Failed to unmarshal %s: %v", "nettica.json", err)
 		}
 	}
 
