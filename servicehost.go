@@ -19,7 +19,12 @@ var netticaServiceHostAPIFmt = "%s/api/v1.0/service/%s/status"
 var netticaServiceHostUpdateAPIFmt = "%s/api/v1.0/service/%s"
 
 func StartServiceHost(s *Server, c chan bool) {
-	host := s.Config.Device.Server
+	var host string
+	for s.Config.Device == nil {
+		time.Sleep(1 * time.Second)
+	}
+
+	host = s.Config.Device.Server
 	var client *http.Client
 	var etag string
 

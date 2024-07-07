@@ -56,6 +56,10 @@ func LoadServers() error {
 				continue
 			}
 
+			if strings.HasSuffix(file.Name(), "-service-host.json") {
+				continue
+			}
+
 			path := filepath.Join(dir, file.Name())
 
 			data, err := os.ReadFile(path)
