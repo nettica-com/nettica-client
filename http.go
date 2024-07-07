@@ -378,6 +378,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	device.OS = runtime.GOOS
 	device.Architecture = runtime.GOARCH
 	device.Version = Version
+	device.Enable = true
 
 	switch req.Method {
 	case "GET":
@@ -457,6 +458,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 					s.Config.Device.OS = runtime.GOOS
 					s.Config.Device.Architecture = runtime.GOARCH
 					s.Config.Device.Version = Version
+					s.Config.Device.Enable = true
 
 					SaveServer(s)
 					s.Worker.UpdateNetticaDevice(device)
