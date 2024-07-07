@@ -1564,6 +1564,7 @@ func DoWork() {
 				s.Worker = &w
 
 				go w.StartServer()
+				go w.StartBackgroundRefreshService()
 				go DoServiceWork(s)
 
 				curTs = calculateCurrentTimestamp()
