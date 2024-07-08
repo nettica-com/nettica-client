@@ -175,7 +175,7 @@ func ParseMessage(msg model.Message) (*DNS, error) {
 		}
 		if index == -1 {
 			log.Errorf("Error reading message for DNS update: %v", msg)
-			return nil, errors.New("Error reading message")
+			return nil, errors.New("error reading message")
 		} else {
 
 			host = msg.Config[i].VPNs[index]

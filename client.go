@@ -27,6 +27,10 @@ var (
 	Count           = 0
 )
 
+var (
+	InstanceID = ""
+)
+
 const (
 	NOFAILOVER = 0
 	FAILOVER   = 1
@@ -175,6 +179,7 @@ func (w Worker) DiscoverDevice() {
 					if err == nil && rsp.StatusCode == 200 {
 						body, err := io.ReadAll(rsp.Body)
 						if err == nil {
+							InstanceID = string(body)
 							w.Context.Config.Device.InstanceID = string(body)
 							log.Infof("AWS Instance ID: %s", w.Context.Config.Device.InstanceID)
 						}
@@ -202,6 +207,7 @@ func (w Worker) DiscoverDevice() {
 			if err == nil && rsp.StatusCode == 200 {
 				body, err := io.ReadAll(rsp.Body)
 				if err == nil {
+					InstanceID = string(body)
 					w.Context.Config.Device.InstanceID = string(body)
 					log.Infof("Azure Instance ID: %s", w.Context.Config.Device.InstanceID)
 				}
@@ -222,6 +228,7 @@ func (w Worker) DiscoverDevice() {
 			if err == nil && rsp.StatusCode == 200 {
 				body, err := io.ReadAll(rsp.Body)
 				if err == nil {
+					InstanceID = string(body)
 					w.Context.Config.Device.InstanceID = string(body)
 					log.Infof("Oracle Instance ID: %s", w.Context.Config.Device.InstanceID)
 				}

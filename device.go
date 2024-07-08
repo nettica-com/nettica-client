@@ -26,14 +26,6 @@ var cfg struct {
 	UpdateKeys bool
 }
 
-type configError struct {
-	message string
-}
-
-func (err *configError) Error() string {
-	return err.message
-}
-
 func loadConfig() error {
 
 	if cfg.loaded {

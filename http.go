@@ -194,7 +194,7 @@ func ServiceHandler(w http.ResponseWriter, req *http.Request) {
 		found := false
 
 		for _, s = range Servers {
-			vpn, vpns, err = s.Worker.FindVPN(net)
+			vpn, vpns, _ = s.Worker.FindVPN(net)
 			if vpn != nil {
 				found = true
 				break
@@ -356,11 +356,12 @@ func deviceHandler(w http.ResponseWriter, req *http.Request) {
 				io.WriteString(w, "")
 				return
 			}
-			log.Errorf("Device %s not found", deviceid)
-			// return a 404 error
-			w.WriteHeader(http.StatusNotFound)
-			return
 		}
+		log.Errorf("Device %s not found", deviceid)
+		// return a 404 error
+		w.WriteHeader(http.StatusNotFound)
+		return
+
 	default:
 		io.WriteString(w, "")
 		log.Infof("Unknown method: %s", req.Method)
@@ -375,10 +376,15 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Access-Control-Allow-Methods", "*")
 
 	device := model.Device{}
+	device.Version = Version
 	device.OS = runtime.GOOS
 	device.Architecture = runtime.GOARCH
 	device.Version = Version
 	device.Enable = true
+	device.CheckInterval = 10
+	device.Name, _ = os.Hostname()
+	device.SourceAddress = "0.0.0.0"
+	device.InstanceID = InstanceID
 
 	switch req.Method {
 	case "GET":
@@ -459,6 +465,8 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 					s.Config.Device.Architecture = runtime.GOARCH
 					s.Config.Device.Version = Version
 					s.Config.Device.Enable = true
+					s.Config.Device.CheckInterval = 10
+					s.Config.Device.Version = Version
 
 					SaveServer(s)
 					s.Worker.UpdateNetticaDevice(device)
@@ -489,6 +497,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 					s.Worker = &w
 
 					go w.StartServer()
+					go w.StartBackgroundRefreshService()
 
 					curTs := calculateCurrentTimestamp()
 

@@ -58,6 +58,7 @@ func main() {
 		log.Info("Using environment variables for configuration")
 		msg := model.Message{}
 		msg.Device = &model.Device{}
+		msg.Device.Version = Version
 		msg.Device.Server = cfg.Server
 		msg.Device.Id = cfg.DeviceID
 		msg.Device.ApiKey = cfg.ApiKey
@@ -65,6 +66,7 @@ func main() {
 		msg.Device.Quiet = cfg.quiet
 		msg.Device.Debug = cfg.debug
 		msg.Device.Enable = true
+		msg.Device.CheckInterval = 10
 
 		server := NewServer(msg.Device.Server, msg)
 		ServersMutex.Lock()
