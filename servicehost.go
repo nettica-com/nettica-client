@@ -118,7 +118,7 @@ func StartContainers(s *Server) error {
 
 	path := s.Path
 	path = strings.TrimSuffix(path, ".json")
-	path = path + "-server-host.json"
+	path = path + "-service-host.json"
 
 	file, err := os.Open(path)
 
