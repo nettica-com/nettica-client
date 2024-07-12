@@ -4,8 +4,6 @@ import (
 	"net"
 	"os"
 	"strings"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // var device model.Device = model.Device{}
@@ -78,12 +76,6 @@ func loadConfig() error {
 		if err != nil {
 			return err
 		}
-		cfg.loaded = true
-		log.Infof("Server:    %s", cfg.Server)
-		log.Infof("DeviceID:  %s", cfg.DeviceID)
-		log.Infof("ApiKey:    %s...", cfg.ApiKey[0:len(cfg.ApiKey)-len(cfg.ApiKey)/2])
-		log.Infof("Quiet:     %t", cfg.quiet)
-
 		cfg.loaded = true
 	}
 	return nil

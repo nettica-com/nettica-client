@@ -30,9 +30,7 @@ func StartServiceHost(s *Server, c chan bool) {
 
 	err := StartContainers(s)
 	if err != nil {
-		if !s.Config.Device.Quiet {
-			log.Errorf("Error starting containers %v", err)
-		}
+		log.Debugf("Error starting containers %v", err)
 	}
 
 	if strings.HasPrefix(host, "http:") {
@@ -124,7 +122,7 @@ func StartContainers(s *Server) error {
 
 	if err != nil {
 		if !s.Config.Device.Quiet {
-			log.Errorf("Error opening config file %v", err)
+			log.Debugf("Error opening config file %v", err)
 		}
 		return err
 	}
@@ -406,7 +404,7 @@ func DoServiceWork(s *Server) {
 		curTs = calculateCurrentTimestamp()
 
 		t := time.Unix(curTs, 0)
-		log.Infof("current timestamp = %v (%s)", curTs, t.UTC())
+		log.Debugf("current timestamp = %v (%s)", curTs, t.UTC())
 
 		for {
 			time.Sleep(1000 * time.Millisecond)

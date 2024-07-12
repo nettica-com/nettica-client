@@ -17,12 +17,18 @@ var (
 )
 
 func NewServer(name string, config model.Message) *Server {
-	return &Server{
+	ServersMutex.Lock()
+	defer ServersMutex.Unlock()
+
+	server := &Server{
 		Name:    name,
 		Path:    GetServerPath(name),
 		Config:  config,
 		Running: make(chan bool),
 	}
+
+	Servers[server.Path] = server
+	return server
 }
 
 func LoadServers() error {

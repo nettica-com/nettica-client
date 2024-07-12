@@ -486,9 +486,9 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 
 				name := device.Server
 				if strings.HasPrefix(strings.ToLower(name), "https://") {
-					name = name[8:]
+					name = strings.ToLower(name[8:])
 				} else if strings.HasPrefix(strings.ToLower(name), "http://") {
-					name = name[7:]
+					name = strings.ToLower(name[7:])
 				}
 
 				server := NewServer(name, msg)
@@ -506,7 +506,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 					curTs := calculateCurrentTimestamp()
 
 					t := time.Unix(curTs, 0)
-					log.Infof("current timestamp = %v (%s)", curTs, t.UTC())
+					log.Debugf("current timestamp = %v (%s)", curTs, t.UTC())
 
 					for {
 						time.Sleep(1000 * time.Millisecond)

@@ -216,21 +216,21 @@ func IsWireguardRunning(netName string) (bool, error) {
 
 	m, err := mgr.Connect()
 	if err != nil {
-		log.Errorf("Error connecting to service manager: %v", err)
+		log.Debugf("Error connecting to service manager: %v", err)
 		return false, err
 	}
 	defer m.Disconnect()
 
 	service, err := m.OpenService("WireGuardTunnel$" + netName)
 	if err != nil {
-		log.Errorf("Error opening service: %v", err)
+		log.Debugf("Error opening service: %v", err)
 		return false, err
 	}
 	defer service.Close()
 
 	status, err := service.Query()
 	if err != nil {
-		log.Errorf("Error querying service: %v", err)
+		log.Debugf("Error querying service: %v", err)
 		return false, err
 	}
 

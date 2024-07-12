@@ -62,6 +62,20 @@ func (w Worker) StartServer() {
 		log.Errorf("Error getting local ip address: %v", err)
 	}
 
+	log.Info("=====================================================")
+	log.Infof("Version:   %s", w.Context.Config.Device.Version)
+	log.Infof("Server:    %s", w.Context.Config.Device.Server)
+	log.Infof("DeviceID:  %s", w.Context.Config.Device.Id)
+	log.Infof("ApiKey:    %s...", w.Context.Config.Device.ApiKey[0:len(w.Context.Config.Device.ApiKey)-len(w.Context.Config.Device.ApiKey)/2])
+	log.Infof("Quiet:     %t", w.Context.Config.Device.Quiet)
+	log.Info("=====================================================")
+
+	if w.Context.Config.Device.Version != Version {
+		log.Infof("Device version now %s; UPDATING SERVER", Version)
+		w.Context.Config.Device.Version = Version
+		w.UpdateNetticaDevice(*w.Context.Config.Device)
+	}
+
 	for {
 		tick := <-w.Context.Running
 
@@ -1440,7 +1454,7 @@ func DoWork() {
 				curTs = calculateCurrentTimestamp()
 
 				t := time.Unix(curTs, 0)
-				log.Infof("current timestamp = %v (%s)", curTs, t.UTC())
+				log.Debugf("current timestamp = %v (%s)", curTs, t.UTC())
 
 				for {
 					time.Sleep(1000 * time.Millisecond)
