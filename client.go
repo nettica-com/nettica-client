@@ -107,7 +107,7 @@ func (w Worker) StartServer() {
 			if !success && !Bounce {
 				success = true
 				Bounce = true
-				NotifyInfo("Network change detected.  Checking for updates...")
+				// NotifyInfo("Network change detected.  Checking for updates...") too mamy of these
 			} else {
 				if FailSafe {
 					if FailSafeActed {
