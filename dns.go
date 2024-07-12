@@ -180,7 +180,7 @@ func ParseMessage(msg model.Message) (*DNS, error) {
 
 			host = msg.Config[i].VPNs[index]
 
-			if msg.Config[i].VPNs[index].Enable && msg.Config[i].VPNs[index].Current.EnableDns {
+			if host.Enable && host.Current.EnableDns {
 				for j := 0; j < len(msg.Config[i].VPNs); j++ {
 					name := strings.ToLower(msg.Config[i].VPNs[j].Name)
 					addresses := strings.Split(msg.Config[i].VPNs[j].Current.Address[0], "/")
@@ -326,7 +326,7 @@ func DropCache() error {
 	return nil
 }
 
-func UpdateDNS(msg model.Message) error {
+func UpdateDNS() error {
 	log.Info("==================== UPDATE DNS ====================")
 
 	return StartDNS()

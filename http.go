@@ -160,6 +160,10 @@ func ServiceHandler(w http.ResponseWriter, req *http.Request) {
 			} else {
 				log.Infof("Update successful.  VPN %s is disabled", net)
 			}
+			if vpn.Current.EnableDns {
+				DropCache()
+				UpdateDNS()
+			}
 		}
 
 		log.Infof("StopWireguard(%s)", net)

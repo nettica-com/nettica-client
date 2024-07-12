@@ -105,6 +105,7 @@ func SaveServer(server *Server) {
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		log.Printf("Failed to write file %s: %v", path, err)
 	}
+	server.Body = data
 }
 
 func GetServerPath(name string) string {

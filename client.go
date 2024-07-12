@@ -124,7 +124,7 @@ func (w Worker) Failsafe() error {
 		return err
 	}
 
-	w.UpdateNetticaConfig(conf)
+	w.UpdateNetticaConfig(conf, false)
 
 	return err
 }
@@ -686,7 +686,7 @@ func (w Worker) GetNetticaVPN(etag string) (string, error) {
 			FailSafeMsgSent = false
 			Count = 0
 		}
-		w.UpdateNetticaConfig(body)
+		w.UpdateNetticaConfig(body, false)
 		return etag, nil
 	}
 
@@ -761,11 +761,14 @@ func (w Worker) UpdateVPN(vpn *model.VPN) error {
 		req.Body.Close()
 	}
 
+	// Save the change locally
+	SaveServer(w.Context)
+
 	return nil
 }
 
 // UpdateNetticaConfig updates the config from the server
-func (w Worker) UpdateNetticaConfig(body []byte) {
+func (w Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 
 	defer func() {
 		Bounce = false
@@ -782,7 +785,7 @@ func (w Worker) UpdateNetticaConfig(body []byte) {
 	conf := w.Context.Body
 
 	// compare the body to the current config and make no changes if they are the same
-	if bytes.Equal(conf, body) && !Bounce && !FailSafe {
+	if bytes.Equal(conf, body) && !Bounce && !FailSafe && !isBackground {
 		return
 	} else {
 		if Bounce {
@@ -886,8 +889,10 @@ func (w Worker) UpdateNetticaConfig(body []byte) {
 
 		// msg schema is:
 		// type Message struct {
-		// 	Device *Device `json:"device"`
-		// 	Config []Net   `json:"config"`
+		//  Version string  `json:"version"`
+		//  Name    string  `json:"name"`
+		// 	Device *Device  `json:"device"`
+		// 	Config []Net    `json:"config"`
 		// }
 		// type Net struct {
 		// 	NetName string `json:"netname"`
@@ -917,7 +922,7 @@ func (w Worker) UpdateNetticaConfig(body []byte) {
 			} else {
 				// physically pull out our VPN from the other configurations
 				vpn := msg.Config[i].VPNs[index]
-				msg.Config[i].VPNs = append(msg.Config[i].VPNs[:index], msg.Config[i].VPNs[index+1:]...)
+				// msg.Config[i].VPNs = append(msg.Config[i].VPNs[:index], msg.Config[i].VPNs[index+1:]...)
 
 				// Configure UPnP as needed
 				go ConfigureUPnP(vpn)
@@ -1100,6 +1105,15 @@ func (w Worker) UpdateNetticaConfig(body []byte) {
 					continue
 				}
 
+				// If this is the background thread, check deeper
+				if isBackground {
+					running, _ := IsWireguardRunning(name)
+					if (running && !vpn.Enable) || (!running && vpn.Enable) {
+						log.Infof("Background: %s Running %t Enable %t - Making Change", name, running, vpn.Enable)
+						force = true
+					}
+				}
+
 				if !force && bytes.Equal(bits, text) {
 					log.Infof("*** SKIPPING %s *** No changes!", name)
 				} else {
@@ -1141,7 +1155,9 @@ func (w Worker) UpdateNetticaConfig(body []byte) {
 						} else {
 							log.Infof("Stopped %s", name)
 							msg := fmt.Sprintf("Network %s has been stopped", name)
-							NotifyInfo(msg)
+							if !isBackground {
+								NotifyInfo(msg)
+							}
 						}
 					} else {
 						// Start the existing service
@@ -1150,7 +1166,9 @@ func (w Worker) UpdateNetticaConfig(body []byte) {
 							log.Infof("Started %s", name)
 							// log.Infof("%s Config: %v", name, msg.Config[i])
 							msg := fmt.Sprintf("Network %s has been updated", name)
-							NotifyInfo(msg)
+							if !isBackground {
+								NotifyInfo(msg)
+							}
 						} else {
 							// try to install the service (on linux, just tries to start the service again)
 							err = InstallWireguard(name)
@@ -1159,7 +1177,9 @@ func (w Worker) UpdateNetticaConfig(body []byte) {
 							} else {
 								log.Infof("Installed %s Config: %v", name, msg.Config[i])
 								msg := fmt.Sprintf("Network %s has been installed", name)
-								NotifyInfo(msg)
+								if !isBackground {
+									NotifyInfo(msg)
+								}
 							}
 						}
 					}
@@ -1168,7 +1188,7 @@ func (w Worker) UpdateNetticaConfig(body []byte) {
 		}
 		// After everything has been processed, update the DNS
 		// We do it here to avoid multiple updates
-		err = UpdateDNS(msg2)
+		err = UpdateDNS()
 		if err != nil {
 			log.Errorf("Error updating DNS configuration: %v", err)
 		}
@@ -1257,17 +1277,11 @@ func (w Worker) ValidateMessage(msg *model.Message) error {
 
 func (w Worker) FindVPN(net string) (*model.VPN, *[]model.VPN, error) {
 
-	var msg model.Message
-	err := json.Unmarshal(w.Context.Body, &msg)
-
-	if err != nil {
-		log.Errorf("Error reading message from context")
-		return nil, nil, err
-	}
+	msg := w.Context.Config
 
 	for i := 0; i < len(msg.Config); i++ {
 		if msg.Config[i].NetName == net {
-			log.Infof("Found net %s", net)
+			log.Infof("Found net %s looking for %s with j=%d", net, w.Context.Config.Device.Id, len(msg.Config[i].VPNs))
 			for j := 0; j < len(msg.Config[i].VPNs); j++ {
 				if msg.Config[i].VPNs[j].DeviceID == w.Context.Config.Device.Id {
 					log.Infof("Found VPN %v", msg.Config[i].VPNs[j])
@@ -1373,161 +1387,10 @@ func (w Worker) StartBackgroundRefreshService() {
 
 	for {
 
-		var msg model.Message
-		err := json.Unmarshal(w.Context.Body, &msg)
-		if err != nil {
-			log.Errorf("Error reading message from server")
+		if w.Context.Body != nil {
+			log.Info("Background Refresh!")
+			w.UpdateNetticaConfig(w.Context.Body, true)
 		}
-
-		log.Debugf("%v", msg)
-
-		// See if the device is enabled.  If its not, stop all networks and return
-		if (msg.Device != nil) && !msg.Device.Enable {
-			log.Infof("Device is disabled, stopping all networks")
-			for i := 0; i < len(msg.Config); i++ {
-				StopWireguard(msg.Config[i].NetName)
-			}
-			return
-		}
-
-		for i := 0; i < len(msg.Config); i++ {
-			index := -1
-			for j := 0; j < len(msg.Config[i].VPNs); j++ {
-				if msg.Config[i].VPNs[j].DeviceID == w.Context.Config.Device.Id {
-					index = j
-					break
-				}
-			}
-			if index == -1 {
-				log.Errorf("Error reading message %v", msg)
-			} else {
-				vpn := msg.Config[i].VPNs[index]
-				msg.Config[i].VPNs = append(msg.Config[i].VPNs[:index], msg.Config[i].VPNs[index+1:]...)
-
-				// Configure UPnP as needed
-				go ConfigureUPnP(vpn)
-
-				// Get our local subnets
-				subnets, err := GetLocalSubnets()
-				if err != nil {
-					log.Errorf("GetLocalSubnets, err = %v", err)
-				}
-				log.Errorf("Subnets: %v", subnets)
-
-				// Iterate through this VPN's addresses and remove any subnets that match
-				// What should be left is the subnets that are local to this device
-				for k := 0; k < len(vpn.Current.Address); k++ {
-					network, err := GetNetworkAddress(vpn.Current.Address[k])
-					if err != nil {
-						log.Errorf("GetNetworkAddress, err = %v", err)
-						continue
-					}
-					for l := 0; l < len(subnets); l++ {
-						if subnets[l].String() == network {
-							log.Errorf("From Local: Removing subnet %s from %s", subnets[l].String(), vpn.Name)
-							subnets = append(subnets[:l], subnets[l+1:]...)
-						}
-					}
-				}
-
-				// If any of the AllowedIPs contain a local subnet, remove that entry
-				// This is to prevent routing loops and is very important
-				for k := 0; k < len(msg.Config[i].VPNs); k++ {
-					allowed := msg.Config[i].VPNs[k].Current.AllowedIPs
-					for l := 0; l < len(allowed); l++ {
-						inSubnet := false
-						if !strings.Contains(allowed[l], "/") {
-							continue
-						}
-						_, s, err := net.ParseCIDR(allowed[l])
-						if err != nil {
-							log.Errorf("net.ParseCIDR err = %v", err)
-							continue
-						}
-						for _, subnet := range subnets {
-							if subnet.Contains(s.IP) {
-								log.Errorf("From Foreign: Removing subnet %s from %s", allowed[l], vpn.Name)
-								inSubnet = true
-							}
-						}
-						if inSubnet {
-							msg.Config[i].VPNs[k].Current.AllowedIPs = append(allowed[:l], allowed[l+1:]...)
-						}
-					}
-				}
-
-				// Check to see if we have the private key
-
-				key, found := KeyLookup(vpn.Current.PublicKey)
-				if !found {
-					KeyAdd(vpn.Current.PublicKey, vpn.Current.PrivateKey)
-					err = KeySave()
-					if err != nil {
-						log.Errorf("Error saving key: %s %s", vpn.Current.PublicKey, vpn.Current.PrivateKey)
-					}
-					key, _ = KeyLookup(vpn.Current.PublicKey)
-				}
-
-				// If the private key is blank create a new one and update the server
-				if key == "" {
-					// delete the old public key
-					KeyDelete(vpn.Current.PublicKey)
-					wg, _ := wgtypes.GeneratePrivateKey()
-					vpn.Current.PrivateKey = wg.String()
-					vpn.Current.PublicKey = wg.PublicKey().String()
-					KeyAdd(vpn.Current.PublicKey, vpn.Current.PrivateKey)
-					KeySave()
-
-					vpn2 := vpn
-					vpn2.Current.PrivateKey = ""
-
-					// Update nettica with the new public key
-					w.UpdateVPN(&vpn2)
-
-				} else {
-					vpn.Current.PrivateKey = key
-				}
-
-				text, err := DumpWireguardConfig(&vpn, &(msg.Config[i].VPNs))
-				if err != nil {
-					log.Errorf("error on template: %s", err)
-				}
-				path := GetWireguardPath()
-				err = os.WriteFile(path+msg.Config[i].NetName+".conf", text, 0600)
-				if err != nil {
-					log.Errorf("Error writing file %s : %s", path+msg.Config[i].NetName+".conf", err)
-				}
-
-				running, err := IsWireguardRunning(msg.Config[i].NetName)
-				if err != nil {
-					log.Errorf("Error checking if wireguard is running: %v", err)
-				}
-
-				if !vpn.Enable {
-					if running || err != nil {
-						log.Infof("Net %s is disabled.  Stopped service...", msg.Config[i].NetName)
-						StopWireguard(msg.Config[i].NetName)
-					}
-				} else {
-					if !running || err != nil {
-						err = StartWireguard(msg.Config[i].NetName)
-						if err == nil {
-							log.Infof("Started %s", msg.Config[i].NetName)
-							log.Infof("%s Config: %v", msg.Config[i].NetName, msg.Config[i])
-						} else {
-							err = InstallWireguard(msg.Config[i].NetName)
-							if err != nil {
-								log.Errorf("Error installing wireguard: %v", err)
-							}
-						}
-					}
-
-				}
-
-			}
-		}
-
-		StartDNS()
 
 		// Do this startup process every hour.  Keeps UPnP ports active, handles laptop sleeps, etc.
 		time.Sleep(60 * time.Minute)

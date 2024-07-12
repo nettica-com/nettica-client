@@ -61,7 +61,7 @@ func Notify(message []byte) error {
 	//conn.WriteMsgUDP(message, nil, raddr)
 	fmt.Fprint(conn, string(message))
 
-	log.Infof("Notification: %v", string(message))
+	log.Debugf("Notification: %v", string(message))
 
 	return nil
 }
