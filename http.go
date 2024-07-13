@@ -508,7 +508,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 					t := time.Unix(curTs, 0)
 					log.Debugf("current timestamp = %v (%s)", curTs, t.UTC())
 
-					for {
+					for !s.Shutdown {
 						time.Sleep(1000 * time.Millisecond)
 						ts := time.Now()
 
@@ -521,6 +521,8 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 						}
 
 					}
+
+					w.Context.Running <- false
 
 				}(server)
 

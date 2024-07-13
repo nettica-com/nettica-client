@@ -21,10 +21,11 @@ func NewServer(name string, config model.Message) *Server {
 	defer ServersMutex.Unlock()
 
 	server := &Server{
-		Name:    name,
-		Path:    GetServerPath(name),
-		Config:  config,
-		Running: make(chan bool),
+		Name:     name,
+		Path:     GetServerPath(name),
+		Config:   config,
+		Running:  make(chan bool),
+		Shutdown: false,
 	}
 
 	Servers[server.Path] = server
@@ -128,12 +129,17 @@ func GetServerPath(name string) string {
 func RemoveServer(server *Server) {
 	ServersMutex.Lock()
 	defer ServersMutex.Unlock()
+	log.Infof("Removing server %s (%s)", server.Name, server.Path)
 
-	server.Running <- false
-	if err := os.Remove(server.Path); err != nil {
-		log.Printf("Failed to remove file %s: %v", server.Path, err)
+	err := os.Remove(server.Path)
+	if err != nil {
+		log.Errorf("Failed to remove file %s: %v", server.Path, err)
 	}
 
 	delete(Servers, server.Path)
+
+	server.Shutdown = true
+
+	log.Info("Server removed")
 
 }

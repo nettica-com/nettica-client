@@ -3,12 +3,13 @@ package main
 import "github.com/nettica-com/nettica-admin/model"
 
 type Server struct {
-	Name    string        `json:"name"`
-	Path    string        `json:"path"`
-	Config  model.Message `json:"config"`
-	Body    []byte        `json:"body"`
-	Running chan bool     `json:"-"`
-	Worker  *Worker       `json:"-"`
+	Name     string        `json:"name"`
+	Path     string        `json:"path"`
+	Config   model.Message `json:"config"`
+	Body     []byte        `json:"body"`
+	Running  chan bool     `json:"-"`
+	Shutdown bool          `json:"-"`
+	Worker   *Worker       `json:"-"`
 }
 
 type ClientWorker interface {

@@ -1399,7 +1399,7 @@ func (w Worker) StartBackgroundRefreshService() {
 
 	time.Sleep(15 * time.Second)
 
-	for {
+	for !w.Context.Shutdown {
 
 		if w.Context.Body != nil {
 			log.Info("Background Refresh!")
@@ -1456,7 +1456,7 @@ func DoWork() {
 				t := time.Unix(curTs, 0)
 				log.Debugf("current timestamp = %v (%s)", curTs, t.UTC())
 
-				for {
+				for !s.Shutdown {
 					time.Sleep(1000 * time.Millisecond)
 					ts := time.Now()
 
@@ -1468,6 +1468,8 @@ func DoWork() {
 						curTs += w.Context.Config.Device.CheckInterval
 					}
 				}
+
+				w.Context.Running <- false
 
 			}(s)
 		}
