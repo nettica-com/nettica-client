@@ -935,8 +935,15 @@ func (w Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 				log.Errorf("Error reading message %v", msg)
 			} else {
 				// physically pull out our VPN from the other configurations
+				// and make a physical copy of the VPNs so the original message
+				// is not altered
 				vpn := msg.Config[i].VPNs[index]
-				vpns := append(msg.Config[i].VPNs[:index], msg.Config[i].VPNs[index+1:]...)
+				vpns := []model.VPN{}
+				for j := 0; j < len(msg.Config[i].VPNs); j++ {
+					if j != index {
+						vpns = append(vpns, msg.Config[i].VPNs[j])
+					}
+				}
 
 				// Configure UPnP as needed
 				go ConfigureUPnP(vpn)
