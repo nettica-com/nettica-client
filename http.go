@@ -411,8 +411,6 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		}
 		if strings.HasPrefix(EZCode, "ez-") || (Srvr != "") {
 			device.Server = Srvr
-			device.Id = DeviceID
-			device.ApiKey = ApiKey
 			device.EZCode = EZCode
 
 			CheckInterval, _ := strconv.ParseInt(req.URL.Query().Get("checkInterval"), 10, 0)
