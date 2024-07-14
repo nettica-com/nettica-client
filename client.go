@@ -593,7 +593,7 @@ func (w Worker) DeleteVPN(id string) error {
 
 func (w Worker) UpdateNetticaDevice(d model.Device) error {
 
-	log.Infof("UPDATING DEVICE: %v", d)
+	log.Infof("UPDATING DEVICE: %s (%s)", d.Name, d.Id)
 
 	if w.Context.Config.Device.Server == "" || w.Context.Config.Device.AccountID == "" || w.Context.Config.Device.ApiKey == "" || w.Context.Config.Device.Id == "" {
 		return errors.New("skipping update, not enough information.  waiting for server to update us")

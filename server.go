@@ -21,8 +21,8 @@ func NewServer(name string, config model.Message) *Server {
 	defer ServersMutex.Unlock()
 
 	server := &Server{
-		Name:     name,
-		Path:     GetServerPath(name),
+		Name:     Sanitize(name),
+		Path:     GetServerPath(Sanitize(name)),
 		Config:   config,
 		Running:  make(chan bool),
 		Shutdown: false,

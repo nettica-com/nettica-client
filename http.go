@@ -398,15 +398,15 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 			Srvr = ""
 		}
 		DeviceID := req.URL.Query().Get("id")
-		if DeviceID == "undefined" {
+		if DeviceID == "undefined" || !strings.HasPrefix(DeviceID, "device-") {
 			DeviceID = ""
 		}
 		ApiKey := req.URL.Query().Get("apiKey")
-		if ApiKey == "undefined" {
+		if ApiKey == "undefined" || !strings.HasPrefix(ApiKey, "device-api") {
 			ApiKey = ""
 		}
 		EZCode := req.URL.Query().Get("ezcode")
-		if EZCode == "undefined" {
+		if EZCode == "undefined" || !strings.HasPrefix(EZCode, "ez-") {
 			EZCode = ""
 		}
 		if strings.HasPrefix(EZCode, "ez-") || (Srvr != "") {
@@ -453,15 +453,15 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 				if s.Config.Device.Server == Srvr {
 					found = true
 
-					if device.EZCode != "" {
+					if device.EZCode != "" && strings.HasPrefix(device.EZCode, "ez-") {
 						s.Config.Device.EZCode = device.EZCode
 					}
 
-					if device.ApiKey != "" {
+					if device.ApiKey != "" && strings.HasPrefix(device.ApiKey, "device-api-") {
 						s.Config.Device.ApiKey = device.ApiKey
 					}
 
-					if device.Id != "" {
+					if device.Id != "" && strings.HasPrefix(device.Id, "device-") {
 						s.Config.Device.Id = device.Id
 					}
 
