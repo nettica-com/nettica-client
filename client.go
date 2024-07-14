@@ -95,7 +95,7 @@ func (w Worker) StartServer() {
 
 		etag, err = w.GetNetticaVPN(etag)
 		if err != nil {
-			log.Errorf("Error getting nettica device: %v", err)
+			log.Errorf("Error getting nettica message: %v", err)
 			success = false
 			Count++
 			if Count > 3 {
@@ -803,11 +803,15 @@ func (w Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 		return
 	} else {
 		if Bounce {
-			log.Info("BOUNCE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+			log.Info("BOUNCE!!!")
 		}
 
 		if FailSafe {
-			log.Info("FailSafe!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+			log.Info("FailSafe!!!")
+		}
+
+		if isBackground {
+			log.Info("Background update")
 		}
 
 		log.Info("Config has changed, updating context")

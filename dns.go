@@ -348,7 +348,7 @@ func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 
 		addrs := global.DnsTable[q]
 		if addrs != nil {
-			log.Infof("--- Query from DnsTable: %s", q)
+			log.Debugf("--- Query from DnsTable: %s", q)
 			m := new(dns.Msg)
 			m.SetReply(r)
 			m.Compress = true
@@ -528,31 +528,31 @@ func MakeQuery(resolver string, net string, q *dns.Msg) (*dns.Msg, error) {
 	//	log.Infof("*** Resolver: %s Query: %s", resolver, q.Question[0].Name)
 
 	// Measure the time it takes to get a response
-	//	start := time.Now()
+	start := time.Now()
 
 	r, _, err := c.Exchange(q, resolver)
 	if err != nil {
 		return nil, err
 	}
 
-	/*	end := time.Now()
-		took := end.Sub(start)
-		if !quiet {
-			s := fmt.Sprintf("**** Response: %s (%v)   %s   %s   %s   ", resolver, took, dns.RcodeToString[r.Rcode], q.Question[0].Name, dns.Type(r.Question[0].Qtype).String())
-			if r.Rcode == dns.RcodeSuccess && len(r.Answer) > 0 {
-				s += fmt.Sprintf("%s   ", dns.Type(r.Answer[0].Header().Rrtype))
-				if r.Answer[0].Header().Rrtype == dns.TypeA {
-					s += r.Answer[0].(*dns.A).A.String()
-				} else if r.Answer[0].Header().Rrtype == dns.TypeAAAA {
-					s += r.Answer[0].(*dns.AAAA).AAAA.String()
-				} else if r.Answer[0].Header().Rrtype == dns.TypePTR {
-					s += r.Answer[0].(*dns.PTR).Ptr
-				} else if r.Answer[0].Header().Rrtype == dns.TypeCNAME {
-					s += r.Answer[0].(*dns.CNAME).Target
-				}
+	end := time.Now()
+	took := end.Sub(start)
+	if log.GetLevel() == log.DebugLevel {
+		s := fmt.Sprintf("**** Response: %s (%v)   %s   %s   %s   ", resolver, took, dns.RcodeToString[r.Rcode], q.Question[0].Name, dns.Type(r.Question[0].Qtype).String())
+		if r.Rcode == dns.RcodeSuccess && len(r.Answer) > 0 {
+			s += fmt.Sprintf("%s   ", dns.Type(r.Answer[0].Header().Rrtype))
+			if r.Answer[0].Header().Rrtype == dns.TypeA {
+				s += r.Answer[0].(*dns.A).A.String()
+			} else if r.Answer[0].Header().Rrtype == dns.TypeAAAA {
+				s += r.Answer[0].(*dns.AAAA).AAAA.String()
+			} else if r.Answer[0].Header().Rrtype == dns.TypePTR {
+				s += r.Answer[0].(*dns.PTR).Ptr
+			} else if r.Answer[0].Header().Rrtype == dns.TypeCNAME {
+				s += r.Answer[0].(*dns.CNAME).Target
 			}
-			log.Infof(s)
-		}*/
+		}
+		log.Debugf(s)
+	}
 	return r, nil
 }
 
