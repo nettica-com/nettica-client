@@ -936,7 +936,7 @@ func (w Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 			} else {
 				// physically pull out our VPN from the other configurations
 				vpn := msg.Config[i].VPNs[index]
-				// msg.Config[i].VPNs = append(msg.Config[i].VPNs[:index], msg.Config[i].VPNs[index+1:]...)
+				vpns := append(msg.Config[i].VPNs[:index], msg.Config[i].VPNs[index+1:]...)
 
 				// Configure UPnP as needed
 				go ConfigureUPnP(vpn)
@@ -963,8 +963,8 @@ func (w Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 
 				// If any of the AllowedIPs contain a local subnet, remove that entry
 				// This is to prevent routing loops and is very important
-				for k := 0; k < len(msg.Config[i].VPNs); k++ {
-					allowed := msg.Config[i].VPNs[k].Current.AllowedIPs
+				for k := 0; k < len(vpns); k++ {
+					allowed := vpns[k].Current.AllowedIPs
 					for l := 0; l < len(allowed); l++ {
 						inSubnet := false
 						if !strings.Contains(allowed[l], "/") {
@@ -980,7 +980,7 @@ func (w Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 							}
 						}
 						if inSubnet {
-							msg.Config[i].VPNs[k].Current.AllowedIPs = append(allowed[:l], allowed[l+1:]...)
+							vpns[k].Current.AllowedIPs = append(allowed[:l], allowed[l+1:]...)
 						}
 					}
 				}
@@ -1025,14 +1025,14 @@ func (w Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 				}
 
 				// Create a new NetName.conf configuration file
-				text, err := DumpWireguardConfig(&vpn, &(msg.Config[i].VPNs))
+				text, err := DumpWireguardConfig(&vpn, &vpns)
 				if err != nil {
 					log.Errorf("error on template: %s", err)
 				}
 
 				// Check the current file and if it's an exact match, do not bounce the service
 				path := GetWireguardPath()
-				name := msg.Config[i].NetName
+				name := vpn.NetName
 
 				var bits []byte
 
@@ -1178,7 +1178,6 @@ func (w Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 						err = StartWireguard(name)
 						if err == nil {
 							log.Infof("Started %s", name)
-							// log.Infof("%s Config: %v", name, msg.Config[i])
 							msg := fmt.Sprintf("Network %s has been updated", name)
 							if !isBackground {
 								NotifyInfo(msg)
