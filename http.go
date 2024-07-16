@@ -398,13 +398,13 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		if Srvr == "undefined" {
 			Srvr = ""
 		}
-		DeviceID := req.URL.Query().Get("id")
-		if DeviceID == "undefined" || !strings.HasPrefix(DeviceID, "device-") {
-			DeviceID = ""
+		device.Id = req.URL.Query().Get("id")
+		if device.Id == "undefined" || !strings.HasPrefix(device.Id, "device-") {
+			device.Id = ""
 		}
-		ApiKey := req.URL.Query().Get("apiKey")
-		if ApiKey == "undefined" || !strings.HasPrefix(ApiKey, "device-api") {
-			ApiKey = ""
+		device.ApiKey = req.URL.Query().Get("apiKey")
+		if device.ApiKey == "undefined" || !strings.HasPrefix(device.ApiKey, "device-api") {
+			device.ApiKey = ""
 		}
 		EZCode := req.URL.Query().Get("ezcode")
 		if EZCode == "undefined" || !strings.HasPrefix(EZCode, "ez-") {
