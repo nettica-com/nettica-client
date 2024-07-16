@@ -21,7 +21,7 @@ func NewServer(name string, config model.Message) *Server {
 	defer ServersMutex.Unlock()
 
 	server := &Server{
-		Name:     Sanitize(name),
+		Name:     CleanupName(name),
 		Path:     GetServerPath(name),
 		Config:   config,
 		Running:  make(chan bool),
@@ -114,7 +114,7 @@ func SaveServer(server *Server) {
 	ServersMutex.Lock()
 	defer ServersMutex.Unlock()
 
-	path := GetServerPath(server.Name)
+	path := server.Path
 	// Although we have a Body field, the JSON is
 	// the source of truth for the config.
 	data, err := json.Marshal(server.Config)
@@ -128,7 +128,8 @@ func SaveServer(server *Server) {
 	server.Body = data
 }
 
-func GetServerPath(name string) string {
+func CleanupName(name string) string {
+
 	// remove the https:// or http:// from the name if it exists
 	if strings.ToLower(name[:8]) == "https://" {
 		name = name[8:]
@@ -136,7 +137,12 @@ func GetServerPath(name string) string {
 		name = name[7:]
 	}
 
-	name = Sanitize(name)
+	return Sanitize(name)
+}
+
+func GetServerPath(name string) string {
+
+	name = CleanupName(name)
 
 	return filepath.Join(GetDataPath(), name+".json")
 }

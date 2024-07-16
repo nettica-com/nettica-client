@@ -74,10 +74,9 @@ func main() {
 			msg.Device.Logging = "info"
 		}
 
-		server := NewServer(msg.Device.Server, msg)
-		ServersMutex.Lock()
-		Servers["env"] = server
-		ServersMutex.Unlock()
+		// Not getting the return value server because it has
+		// been added to the Servers list and will be started shortly
+		_ = NewServer(msg.Device.Server, msg)
 	}
 
 	KeyInitialize()
