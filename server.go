@@ -22,7 +22,7 @@ func NewServer(name string, config model.Message) *Server {
 
 	server := &Server{
 		Name:     Sanitize(name),
-		Path:     GetServerPath(Sanitize(name)),
+		Path:     GetServerPath(name),
 		Config:   config,
 		Running:  make(chan bool),
 		Shutdown: false,
@@ -135,6 +135,8 @@ func GetServerPath(name string) string {
 	} else if strings.ToLower(name[:7]) == "http://" {
 		name = name[7:]
 	}
+
+	name = Sanitize(name)
 
 	return filepath.Join(GetDataPath(), name+".json")
 }
