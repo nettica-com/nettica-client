@@ -850,7 +850,7 @@ func (w Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 			log.Infof("Old config: %v", string(conf))
 		}
 
-		if msg.Device.Logging != oldconf.Device.Logging {
+		if oldconf.Device != nil && msg.Device.Logging != oldconf.Device.Logging {
 			switch msg.Device.Logging {
 			case "debug":
 				log.SetLevel(log.DebugLevel)
