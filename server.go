@@ -86,6 +86,19 @@ func LoadServers() error {
 				server.Name = strings.TrimSuffix(file.Name(), ".json")
 			}
 
+			if server.Config.Device != nil {
+				switch server.Config.Device.Logging {
+				case "debug":
+					log.SetLevel(log.DebugLevel)
+				case "info":
+					log.SetLevel(log.InfoLevel)
+				case "error":
+					log.SetLevel(log.ErrorLevel)
+				default:
+					log.SetLevel(log.FatalLevel)
+				}
+			}
+
 			server.Path = path
 			server.Body = data
 			server.Running = make(chan bool)

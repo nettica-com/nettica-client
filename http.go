@@ -389,6 +389,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	device.Name, _ = os.Hostname()
 	device.SourceAddress = "0.0.0.0"
 	device.InstanceID = InstanceID
+	device.Logging = ""
 
 	switch req.Method {
 	case "GET":
@@ -438,6 +439,8 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 				device.Architecture = arch
 			}
 
+			device.Logging = req.URL.Query().Get("logging")
+
 			instanceid := req.URL.Query().Get("instanceid")
 			if instanceid != "" && instanceid != "undefined" {
 				device.InstanceID = instanceid
@@ -463,6 +466,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 						s.Config.Device.Id = device.Id
 					}
 
+					s.Config.Device.Logging = device.Logging
 					s.Config.Device.OS = runtime.GOOS
 					s.Config.Device.Architecture = runtime.GOARCH
 					s.Config.Device.Version = Version

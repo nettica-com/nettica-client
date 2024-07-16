@@ -67,7 +67,7 @@ func (w Worker) StartServer() {
 	log.Infof("Server:    %s", w.Context.Config.Device.Server)
 	log.Infof("DeviceID:  %s", w.Context.Config.Device.Id)
 	log.Infof("ApiKey:    %s...", w.Context.Config.Device.ApiKey[0:len(w.Context.Config.Device.ApiKey)-len(w.Context.Config.Device.ApiKey)/2])
-	log.Infof("Quiet:     %t", w.Context.Config.Device.Quiet)
+	log.Infof("Logging:   %s", w.Context.Config.Device.Logging)
 	log.Info("=====================================================")
 
 	if w.Context.Config.Device.Version != Version {
@@ -311,7 +311,7 @@ func (w Worker) CallNettica(etag *string) ([]byte, error) {
 	}
 
 	var reqURL string = fmt.Sprintf(netticaDeviceStatusAPIFmt, server, w.Context.Config.Device.Id)
-	if !w.Context.Config.Device.Quiet {
+	if w.Context.Config.Device.Logging != "" {
 		s := "NXDOMAIN"
 		if len(answer) > 0 {
 			s = answer[0].String()
@@ -407,9 +407,7 @@ func (w Worker) GetNetticaDevice() (*model.Device, error) {
 	}
 
 	var reqURL string = fmt.Sprintf(netticaDeviceAPIFmt, server, w.Context.Config.Device.Id)
-	if !w.Context.Config.Device.Quiet {
-		log.Infof("  GET %s", reqURL)
-	}
+	log.Infof("  GET %s", reqURL)
 
 	// Create a context with a 15 second timeout
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(15*time.Second))
@@ -481,9 +479,7 @@ func (w Worker) DeleteDevice(id string) error {
 	}
 
 	var reqURL string = fmt.Sprintf(netticaDeviceAPIFmt, w.Context.Config.Device.Server, id)
-	if !w.Context.Config.Device.Quiet {
-		log.Infof("  DELETE %s", reqURL)
-	}
+	log.Debugf("  DELETE %s", reqURL)
 
 	// Create a context with a 15 second timeout
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(15*time.Second))
@@ -549,9 +545,7 @@ func (w Worker) DeleteVPN(id string) error {
 	}
 
 	var reqURL string = fmt.Sprintf(netticaVPNUpdateAPIFmt, w.Context.Config.Device.Server, id)
-	if !w.Context.Config.Device.Quiet {
-		log.Infof("  DELETE %s", reqURL)
-	}
+	log.Debugf("  DELETE %s", reqURL)
 
 	// Create a context with a 15 second timeout
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(15*time.Second))
@@ -592,6 +586,17 @@ func (w Worker) DeleteVPN(id string) error {
 }
 
 func (w Worker) UpdateNetticaDevice(d model.Device) error {
+
+	switch d.Logging {
+	case "debug":
+		log.SetLevel(log.DebugLevel)
+	case "info":
+		log.SetLevel(log.InfoLevel)
+	case "error":
+		log.SetLevel(log.ErrorLevel)
+	default:
+		log.SetLevel(log.FatalLevel)
+	}
 
 	log.Infof("UPDATING DEVICE: %s (%s)", d.Name, d.Id)
 
@@ -843,6 +848,19 @@ func (w Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 		if err != nil {
 			log.Errorf("Error reading old config: %v", err)
 			log.Infof("Old config: %v", string(conf))
+		}
+
+		if msg.Device.Logging != oldconf.Device.Logging {
+			switch msg.Device.Logging {
+			case "debug":
+				log.SetLevel(log.DebugLevel)
+			case "info":
+				log.SetLevel(log.InfoLevel)
+			case "error":
+				log.SetLevel(log.ErrorLevel)
+			default:
+				log.SetLevel(log.FatalLevel)
+			}
 		}
 
 		log.Debugf("Server Msg: %v", msg)

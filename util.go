@@ -65,11 +65,7 @@ func CompareDevices(d1 *model.Device, d2 *model.Device) bool {
 		return false
 	}
 
-	if d1.Quiet != d2.Quiet {
-		return false
-	}
-
-	if d1.Debug != d2.Debug {
+	if d1.Logging != d2.Logging {
 		return false
 	}
 

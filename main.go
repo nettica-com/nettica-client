@@ -63,10 +63,16 @@ func main() {
 		msg.Device.Id = cfg.DeviceID
 		msg.Device.ApiKey = cfg.ApiKey
 		msg.Device.UpdateKeys = cfg.UpdateKeys
-		msg.Device.Quiet = cfg.quiet
-		msg.Device.Debug = cfg.debug
 		msg.Device.Enable = true
 		msg.Device.CheckInterval = 10
+
+		if cfg.debug {
+			msg.Device.Logging = "debug"
+		} else if cfg.quiet {
+			msg.Device.Logging = "error"
+		} else {
+			msg.Device.Logging = "info"
+		}
 
 		server := NewServer(msg.Device.Server, msg)
 		ServersMutex.Lock()

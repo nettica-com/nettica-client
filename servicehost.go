@@ -66,9 +66,7 @@ func StartServiceHost(s *Server, c chan bool) {
 		// Only make API call if ServiceGroup is set
 		if s.Config.Device.ServiceGroup != "" && s.Config.Device.ServiceApiKey != "" {
 			var reqURL string = fmt.Sprintf(netticaServiceHostAPIFmt, host, s.Config.Device.ServiceGroup)
-			if !s.Config.Device.Quiet {
-				log.Infof("  GET %s", reqURL)
-			}
+			log.Debugf("  GET %s", reqURL)
 
 			var buffer []byte
 			req, err := http.NewRequest("GET", reqURL, bytes.NewBuffer(buffer))
@@ -121,9 +119,7 @@ func StartContainers(s *Server) error {
 	file, err := os.Open(path)
 
 	if err != nil {
-		if !s.Config.Device.Quiet {
-			log.Debugf("Error opening config file %v", err)
-		}
+		log.Debugf("Error opening config file %v", err)
 		return err
 	}
 	body, err := io.ReadAll(file)

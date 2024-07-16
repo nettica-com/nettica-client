@@ -5,7 +5,7 @@ go 1.22.4
 require (
 	github.com/huin/goupnp v1.3.0
 	github.com/miekg/dns v1.1.61
-	github.com/nettica-com/nettica-admin v0.0.0-20240708070537-988775ed63c6
+	github.com/nettica-com/nettica-admin v0.0.0-20240715135806-f206a0825d54
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/sys v0.22.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
