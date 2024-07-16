@@ -137,6 +137,8 @@ func CleanupName(name string) string {
 		name = name[7:]
 	}
 
+	name = strings.ToLower(name)
+
 	return Sanitize(name)
 }
 
