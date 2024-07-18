@@ -47,11 +47,11 @@ var (
 type Worker struct {
 	// Context is the server context
 	Context *Server `json:"context"`
-	client  *http.Client
+	Client  *http.Client
 }
 
 // Start the channel that iterates the nettica update function
-func (w Worker) StartServer() {
+func (w *Worker) StartServer() {
 
 	log.Infof("StartServer Nettica Host %s", w.Context.Config.Device.Server)
 	etag := ""
@@ -123,7 +123,7 @@ func (w Worker) StartServer() {
 	}
 }
 
-func (w Worker) Failsafe() error {
+func (w *Worker) Failsafe() error {
 
 	file, err := os.Open(w.Context.Path)
 
@@ -160,7 +160,7 @@ func GetLocalIP() (string, error) {
 	return ip, err
 }
 
-func (w Worker) DiscoverDevice() {
+func (w *Worker) DiscoverDevice() {
 
 	// don't do anything if the device is configured
 	if w.Context.Config.Device.Registered {
@@ -258,7 +258,35 @@ func (w Worker) DiscoverDevice() {
 
 }
 
-func (w Worker) CallNettica(etag *string) ([]byte, error) {
+func GetHttpClient(server string) *http.Client {
+	var client *http.Client
+	if strings.HasPrefix(server, "http:") {
+		client = &http.Client{
+			Timeout: time.Second * 10,
+		}
+	} else {
+		// Create a transport like http.DefaultTransport, but with the configured LocalAddr
+		log.Infof("Creating new connection to %s", server)
+		transport := &http.Transport{
+			Proxy:             http.ProxyFromEnvironment,
+			DisableKeepAlives: false,
+			Dial: (&net.Dialer{
+				Timeout:   5 * time.Second,
+				KeepAlive: 70 * time.Second,
+				LocalAddr: cfg.sourceAddr,
+			}).Dial,
+			TLSHandshakeTimeout: 10 * time.Second,
+		}
+		client = &http.Client{
+			Transport: transport,
+		}
+
+	}
+
+	return client
+}
+
+func (w *Worker) CallNettica(etag *string) ([]byte, error) {
 
 	server := w.Context.Config.Device.Server
 
@@ -278,27 +306,8 @@ func (w Worker) CallNettica(etag *string) ([]byte, error) {
 		return nil, fmt.Errorf("no device configuration")
 	}
 
-	if w.client == nil {
-		if strings.HasPrefix(server, "http:") {
-			w.client = &http.Client{
-				Timeout: time.Second * 10,
-			}
-		} else {
-			// Create a transport like http.DefaultTransport, but with the configured LocalAddr
-			transport := &http.Transport{
-				Proxy: http.ProxyFromEnvironment,
-				Dial: (&net.Dialer{
-					Timeout:   5 * time.Second,
-					KeepAlive: 60 * time.Second,
-					LocalAddr: cfg.sourceAddr,
-				}).Dial,
-				TLSHandshakeTimeout: 10 * time.Second,
-			}
-			w.client = &http.Client{
-				Transport: transport,
-			}
-
-		}
+	if w.Client == nil {
+		w.Client = GetHttpClient(server)
 	}
 
 	host := server
@@ -332,12 +341,20 @@ func (w Worker) CallNettica(etag *string) ([]byte, error) {
 	if req != nil {
 		req.Header.Set("X-API-KEY", w.Context.Config.Device.ApiKey)
 		req.Header.Set("User-Agent", "nettica-client/"+Version)
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
 		req.Header.Set("If-None-Match", *etag)
+
+		log.Infof(" Headers: %v", req.Header)
 	}
 
-	resp, err := w.client.Do(req)
+	resp, err := w.Client.Do(req)
 	if err == nil {
+		body, errb := io.ReadAll(resp.Body)
+		if errb != nil {
+			log.Errorf("error reading body %v", errb)
+		}
+		resp.Body.Close()
+
 		if resp.StatusCode == 304 {
 			buffer := w.Context.Body
 			return buffer, nil
@@ -349,19 +366,12 @@ func (w Worker) CallNettica(etag *string) ([]byte, error) {
 			log.Errorf("Response Error Code: %v", resp.StatusCode)
 			return nil, fmt.Errorf("response error code: %v", resp.StatusCode)
 		} else {
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				log.Errorf("error reading body %v", err)
-			}
-			log.Debugf("%s", string(body))
-
 			etag2 := resp.Header.Get("ETag")
 
 			if *etag != etag2 {
 				log.Infof("etag = %s  etag2 = %s", *etag, etag2)
 				*etag = etag2
 			}
-			resp.Body.Close()
 
 			return body, nil
 		}
@@ -373,7 +383,7 @@ func (w Worker) CallNettica(etag *string) ([]byte, error) {
 
 }
 
-func (w Worker) GetNetticaDevice() (*model.Device, error) {
+func (w *Worker) GetNetticaDevice() (*model.Device, error) {
 
 	if !cfg.loaded {
 		err := loadConfig()
@@ -383,27 +393,9 @@ func (w Worker) GetNetticaDevice() (*model.Device, error) {
 	}
 
 	server := w.Context.Config.Device.Server
-	var client *http.Client
 
-	if strings.HasPrefix(server, "http:") {
-		client = &http.Client{
-			Timeout: time.Second * 10,
-		}
-	} else {
-		// Create a transport like http.DefaultTransport, but with the configured LocalAddr
-		transport := &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			Dial: (&net.Dialer{
-				Timeout:   5 * time.Second,
-				KeepAlive: 60 * time.Second,
-				LocalAddr: cfg.sourceAddr,
-			}).Dial,
-			TLSHandshakeTimeout: 10 * time.Second,
-		}
-		client = &http.Client{
-			Transport: transport,
-		}
-
+	if w.Client == nil {
+		w.Client = GetHttpClient(server)
 	}
 
 	var reqURL string = fmt.Sprintf(netticaDeviceAPIFmt, server, w.Context.Config.Device.Id)
@@ -420,22 +412,22 @@ func (w Worker) GetNetticaDevice() (*model.Device, error) {
 	if req != nil {
 		req.Header.Set("X-API-KEY", w.Context.Config.Device.ApiKey)
 		req.Header.Set("User-Agent", "nettica-client/"+Version)
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
 	}
-	resp, err := client.Do(req)
+	resp, err := w.Client.Do(req)
 	if err == nil {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Errorf("error reading body %v", err)
+		}
+		resp.Body.Close()
+
 		if resp.StatusCode == 401 {
 			return nil, fmt.Errorf("Unauthorized")
 		} else if resp.StatusCode != 200 {
 			log.Errorf("Response Error Code: %v", resp.StatusCode)
 			return nil, fmt.Errorf("response error code: %v", resp.StatusCode)
 		} else {
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				log.Errorf("error reading body %v", err)
-			}
-			log.Debugf("%s", string(body))
-			resp.Body.Close()
 
 			// Marshall the JSON into a Device struct
 			var d model.Device
@@ -453,29 +445,10 @@ func (w Worker) GetNetticaDevice() (*model.Device, error) {
 	return nil, err
 }
 
-func (w Worker) DeleteDevice(id string) error {
+func (w *Worker) DeleteDevice(id string) error {
 
-	var client *http.Client
-
-	if strings.HasPrefix(w.Context.Config.Device.Server, "http:") {
-		client = &http.Client{
-			Timeout: time.Second * 10,
-		}
-	} else {
-		// Create a transport like http.DefaultTransport, but with the configured LocalAddr
-		transport := &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			Dial: (&net.Dialer{
-				Timeout:   5 * time.Second,
-				KeepAlive: 60 * time.Second,
-				LocalAddr: cfg.sourceAddr,
-			}).Dial,
-			TLSHandshakeTimeout: 10 * time.Second,
-		}
-		client = &http.Client{
-			Transport: transport,
-		}
-
+	if w.Client == nil {
+		w.Client = GetHttpClient(w.Context.Config.Device.Server)
 	}
 
 	var reqURL string = fmt.Sprintf(netticaDeviceAPIFmt, w.Context.Config.Device.Server, id)
@@ -492,9 +465,8 @@ func (w Worker) DeleteDevice(id string) error {
 	if req != nil {
 		req.Header.Set("X-API-KEY", w.Context.Config.Device.ApiKey)
 		req.Header.Set("User-Agent", "nettica-client/"+Version)
-		req.Header.Set("Content-Type", "application/json")
 	}
-	resp, err := client.Do(req)
+	resp, err := w.Client.Do(req)
 	if err == nil {
 		if resp.StatusCode == 401 {
 			return fmt.Errorf("Unauthorized")
@@ -519,29 +491,10 @@ func (w Worker) DeleteDevice(id string) error {
 
 }
 
-func (w Worker) DeleteVPN(id string) error {
+func (w *Worker) DeleteVPN(id string) error {
 
-	var client *http.Client
-
-	if strings.HasPrefix(w.Context.Config.Device.Server, "http:") {
-		client = &http.Client{
-			Timeout: time.Second * 10,
-		}
-	} else {
-		// Create a transport like http.DefaultTransport, but with the configured LocalAddr
-		transport := &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			Dial: (&net.Dialer{
-				Timeout:   5 * time.Second,
-				KeepAlive: 60 * time.Second,
-				LocalAddr: cfg.sourceAddr,
-			}).Dial,
-			TLSHandshakeTimeout: 10 * time.Second,
-		}
-		client = &http.Client{
-			Transport: transport,
-		}
-
+	if w.Client == nil {
+		w.Client = GetHttpClient(w.Context.Config.Device.Server)
 	}
 
 	var reqURL string = fmt.Sprintf(netticaVPNUpdateAPIFmt, w.Context.Config.Device.Server, id)
@@ -558,22 +511,24 @@ func (w Worker) DeleteVPN(id string) error {
 	if req != nil {
 		req.Header.Set("X-API-KEY", w.Context.Config.Device.ApiKey)
 		req.Header.Set("User-Agent", "nettica-client/"+Version)
-		req.Header.Set("Content-Type", "application/json")
 	}
-	resp, err := client.Do(req)
+	resp, err := w.Client.Do(req)
 	if err == nil {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Errorf("error reading body %v", err)
+		}
+		if body != nil {
+			log.Debugf("%s", string(body))
+		}
+		resp.Body.Close()
+
 		if resp.StatusCode == 401 {
 			return fmt.Errorf("Unauthorized")
 		} else if resp.StatusCode != 200 {
 			log.Errorf("Response Error Code: %v", resp.StatusCode)
 			return fmt.Errorf("response error code: %v", resp.StatusCode)
 		} else {
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				log.Errorf("error reading body %v", err)
-			}
-			log.Debugf("%s", string(body))
-			resp.Body.Close()
 
 			return nil
 		}
@@ -585,7 +540,7 @@ func (w Worker) DeleteVPN(id string) error {
 
 }
 
-func (w Worker) UpdateNetticaDevice(d model.Device) error {
+func (w *Worker) UpdateNetticaDevice(d model.Device) error {
 
 	switch d.Logging {
 	case "debug":
@@ -605,27 +560,9 @@ func (w Worker) UpdateNetticaDevice(d model.Device) error {
 	}
 
 	server := w.Context.Config.Device.Server
-	var client *http.Client
 
-	if strings.HasPrefix(server, "http:") {
-		client = &http.Client{
-			Timeout: time.Second * 10,
-		}
-	} else {
-		// Create a transport like http.DefaultTransport, but with the configured LocalAddr
-		transport := &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			Dial: (&net.Dialer{
-				Timeout:   5 * time.Second,
-				KeepAlive: 60 * time.Second,
-				LocalAddr: cfg.sourceAddr,
-			}).Dial,
-			TLSHandshakeTimeout: 10 * time.Second,
-		}
-		client = &http.Client{
-			Transport: transport,
-		}
-
+	if w.Client == nil {
+		w.Client = GetHttpClient(server)
 	}
 
 	var reqURL string = fmt.Sprintf(netticaDeviceAPIFmt, server, d.Id)
@@ -647,19 +584,23 @@ func (w Worker) UpdateNetticaDevice(d model.Device) error {
 		req.Header.Set("X-API-KEY", w.Context.Config.Device.ApiKey)
 		req.Header.Set("User-Agent", "nettica-client/"+Version)
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
 	}
 
-	resp, err := client.Do(req)
+	resp, err := w.Client.Do(req)
 	if err == nil {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Errorf("error reading body %v", err)
+		} else {
+			log.Debugf("%s", string(body))
+		}
+
 		if resp.StatusCode != 200 {
 			log.Errorf("PATCH Error: Response %v", resp.StatusCode)
-		} else {
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				log.Errorf("error reading body %v", err)
-			}
-			log.Infof("%s", string(body))
 		}
+	} else {
+		log.Errorf("ERROR: %v", err)
 	}
 
 	if resp != nil {
@@ -669,10 +610,10 @@ func (w Worker) UpdateNetticaDevice(d model.Device) error {
 		req.Body.Close()
 	}
 
-	return nil
+	return err
 }
 
-func (w Worker) GetNetticaVPN(etag string) (string, error) {
+func (w *Worker) GetNetticaVPN(etag string) (string, error) {
 
 	if !cfg.loaded {
 		err := loadConfig()
@@ -683,7 +624,7 @@ func (w Worker) GetNetticaVPN(etag string) (string, error) {
 
 	body, err := w.CallNettica(&etag)
 	if err != nil {
-		w.client = nil
+		w.Client = nil
 		if err.Error() == "Unauthorized" {
 			log.Errorf("Unauthorized - reload config")
 			// Read the config and find another API key
@@ -712,31 +653,13 @@ func (w Worker) GetNetticaVPN(etag string) (string, error) {
 	return "", err
 }
 
-func (w Worker) UpdateVPN(vpn *model.VPN) error {
+func (w *Worker) UpdateVPN(vpn *model.VPN) error {
 
 	log.Infof(" ******************** UPDATING VPN: %s ********************", vpn.Name)
 	server := w.Context.Config.Device.Server
-	var client *http.Client
 
-	if strings.HasPrefix(server, "http:") {
-		client = &http.Client{
-			Timeout: time.Second * 10,
-		}
-	} else {
-		// Create a transport like http.DefaultTransport, but with the configured LocalAddr
-		transport := &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			Dial: (&net.Dialer{
-				Timeout:   5 * time.Second,
-				KeepAlive: 60 * time.Second,
-				LocalAddr: cfg.sourceAddr,
-			}).Dial,
-			TLSHandshakeTimeout: 10 * time.Second,
-		}
-		client = &http.Client{
-			Transport: transport,
-		}
-
+	if w.Client == nil {
+		w.Client = GetHttpClient(server)
 	}
 
 	var reqURL string = fmt.Sprintf(netticaVPNUpdateAPIFmt, server, vpn.Id)
@@ -760,16 +683,17 @@ func (w Worker) UpdateVPN(vpn *model.VPN) error {
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	resp, err := client.Do(req)
+	resp, err := w.Client.Do(req)
 	if err == nil {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Errorf("error reading body %v", err)
+		} else {
+			log.Infof("%s", string(body))
+		}
+
 		if resp.StatusCode != 200 {
 			log.Errorf("PATCH Error: Response %v", resp.StatusCode)
-		} else {
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				log.Errorf("error reading body %v", err)
-			}
-			log.Infof("%s", string(body))
 		}
 	}
 
@@ -787,7 +711,7 @@ func (w Worker) UpdateVPN(vpn *model.VPN) error {
 }
 
 // UpdateNetticaConfig updates the config from the server
-func (w Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
+func (w *Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 
 	defer func() {
 		Bounce = false
@@ -1250,7 +1174,7 @@ func (w Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 // 4. The Type of VPN is set to Service
 // 5. The overall Device and VPN conform to their models
 // This will allow the host to be used in the wild without fear of exploitation
-func (w Worker) ValidateMessage(msg *model.Message) error {
+func (w *Worker) ValidateMessage(msg *model.Message) error {
 
 	if !ServiceHost {
 		return nil
@@ -1317,7 +1241,7 @@ func (w Worker) ValidateMessage(msg *model.Message) error {
 	return nil
 }
 
-func (w Worker) FindVPN(net string) (*model.VPN, *[]model.VPN, error) {
+func (w *Worker) FindVPN(net string) (*model.VPN, *[]model.VPN, error) {
 
 	msg := w.Context.Config
 
@@ -1337,7 +1261,7 @@ func (w Worker) FindVPN(net string) (*model.VPN, *[]model.VPN, error) {
 
 }
 
-func (w Worker) FindVPNById(id string) (*model.VPN, *[]model.VPN, error) {
+func (w *Worker) FindVPNById(id string) (*model.VPN, *[]model.VPN, error) {
 
 	var msg model.Message
 	err := json.Unmarshal(w.Context.Body, &msg)
@@ -1360,7 +1284,7 @@ func (w Worker) FindVPNById(id string) (*model.VPN, *[]model.VPN, error) {
 
 }
 
-func (w Worker) StopAllVPNs() error {
+func (w *Worker) StopAllVPNs() error {
 
 	log.Infof(" ******************** STOPPING ALL VPNS ********************")
 
@@ -1420,7 +1344,7 @@ func (w Worker) StopAllVPNs() error {
 }
 
 // This needs to be refactored with the main logic above
-func (w Worker) StartBackgroundRefreshService() {
+func (w *Worker) StartBackgroundRefreshService() {
 
 	// Wait for the main thread to contact Nettica at least once before starting up the VPNs
 	// on a reboot
