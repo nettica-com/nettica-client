@@ -48,6 +48,7 @@ for ARCH in ${ARCHS[@]}; do
     sed -i "s/2.X.X/$VERSION/g" rpmbuild-${VERSION}/SPECS/nettica.spec
     rpmbuild --verbose --target ${ARCH} -bb rpmbuild-${VERSION}/SPECS/nettica.spec
     rm -rf rpmbuild-${VERSION}/
+    mv ~/rpmbuild/RPMS/$ARCH/nettica-$VERSION-1.$ARCH.rpm .
 
     echo RPM built
 
