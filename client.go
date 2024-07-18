@@ -344,7 +344,6 @@ func (w *Worker) CallNettica(etag *string) ([]byte, error) {
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("If-None-Match", *etag)
 
-		log.Infof(" Headers: %v", req.Header)
 	}
 
 	resp, err := w.Client.Do(req)
