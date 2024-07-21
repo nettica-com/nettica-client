@@ -1,6 +1,0 @@
-Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: nettica-client
-Source: https://github.com/nettica-com/nettica-admin-client
-
-Files: *
-Copyright: 2023 Nettica Corporation

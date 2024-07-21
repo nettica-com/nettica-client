@@ -1,5 +1,0 @@
-#!/usr/bin/make -f
-export DH_GOPKG := github.com/nettica-com/nettica-admin-client
-
-%:
-	dh $@ --buildsystem=golang --with=golang
