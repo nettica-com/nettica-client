@@ -20,9 +20,8 @@ env CGO_ENABLED=0 go build
 ### Build for Debian Linux distributions
 
 ```
-./build.sh 1.0.0 armhf
-./build.sh 1.0.0 arm64
-./build.sh 1.0.0 amd64
+./build.sh 1.0.0 [ amd64 | arm64 | armhf]
+# Builds all three platforms if not specified
 ```
 
 ### Usage Linux
@@ -55,13 +54,8 @@ net stop nettica
 ### Build for Fedora (RPM) Linux distributions
 
 ```
-./build.sh 1.0.0 amd64
-cd rpmbuild/SPECS
-nano nettica.spec
-
-# Update the version and platform as necessary
-
-rpmbuild -bb nettica.spec
+./buildrpm.sh 1.0.0 [ x86_64 | aarch64 ]
+# Builds both platforms if not specified
 ```
 
 ### Build Docker image
@@ -72,6 +66,9 @@ Nettica uses an Alpine base and is about 40MB
 sudo docker build . --no-cache
 sudo docker images
 sudo docker tag xxx nettica-client:latest
+
+docker_buildx.cmd 1.0.0 [latest]
+# cross compiles linux amd64, arm64, and armv7 and pushes to docker as a multi-platform image
 ```
 
 ## Notes
