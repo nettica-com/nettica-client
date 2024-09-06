@@ -398,15 +398,15 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		if Srvr == "undefined" {
 			Srvr = ""
 		}
-		device.Id = req.URL.Query().Get("id")
+		device.Id = Sanitize(req.URL.Query().Get("id"))
 		if device.Id == "undefined" || !strings.HasPrefix(device.Id, "device-") {
 			device.Id = ""
 		}
-		device.ApiKey = req.URL.Query().Get("apiKey")
+		device.ApiKey = Sanitize(req.URL.Query().Get("apiKey"))
 		if device.ApiKey == "undefined" || !strings.HasPrefix(device.ApiKey, "device-api") {
 			device.ApiKey = ""
 		}
-		EZCode := req.URL.Query().Get("ezcode")
+		EZCode := Sanitize(req.URL.Query().Get("ezcode"))
 		if EZCode == "undefined" || !strings.HasPrefix(EZCode, "ez-") {
 			EZCode = ""
 		}
@@ -419,29 +419,29 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 				device.CheckInterval = CheckInterval
 			}
 
-			accountid := req.URL.Query().Get("accountid")
+			accountid := Sanitize(req.URL.Query().Get("accountid"))
 			if accountid != "" && accountid != "undefined" {
 				device.AccountID = accountid
 			}
 
-			name := req.URL.Query().Get("name")
+			name := Sanitize(req.URL.Query().Get("name"))
 			if name != "" {
 				device.Name = name
 			}
 
-			os := req.URL.Query().Get("os")
+			os := Sanitize(req.URL.Query().Get("os"))
 			if os != "" {
 				device.OS = os
 			}
 
-			arch := req.URL.Query().Get("arch")
+			arch := Sanitize(req.URL.Query().Get("arch"))
 			if arch != "" {
 				device.Architecture = arch
 			}
 
-			device.Logging = req.URL.Query().Get("logging")
+			device.Logging = Sanitize(req.URL.Query().Get("logging"))
 
-			instanceid := req.URL.Query().Get("instanceid")
+			instanceid := Sanitize(req.URL.Query().Get("instanceid"))
 			if instanceid != "" && instanceid != "undefined" {
 				device.InstanceID = instanceid
 			}
@@ -469,13 +469,12 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 					s.Config.Device.Logging = device.Logging
 					s.Config.Device.OS = runtime.GOOS
 					s.Config.Device.Architecture = runtime.GOARCH
-					s.Config.Device.Version = Version
 					s.Config.Device.Enable = true
 					s.Config.Device.CheckInterval = 10
 					s.Config.Device.Version = Version
 
 					SaveServer(s)
-					s.Worker.UpdateNetticaDevice(device)
+					s.Worker.UpdateNetticaDevice(*s.Config.Device)
 
 					break
 
@@ -492,12 +491,19 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 				} else if strings.HasPrefix(strings.ToLower(name), "http://") {
 					name = strings.ToLower(name[7:])
 				}
+				name = strings.TrimSuffix(name, "/")
+				nameCheck := Sanitize(name)
+				if nameCheck != name {
+					log.Errorf("Invalid server name: %s", name)
+					w.WriteHeader(http.StatusBadRequest)
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = w.Write([]byte(`{"error": "Bad Request - Invalid server name"}`))
+					return
+				}
 
 				server := NewServer(name, msg)
 				SaveServer(server)
 				go func(s *Server) {
-
-					log.Infof("Server: %v", s)
 
 					w := Worker{Context: s}
 					s.Worker = &w

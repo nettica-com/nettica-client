@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -160,13 +161,9 @@ func GetLocalIP() (string, error) {
 	return ip, err
 }
 
-func (w *Worker) DiscoverDevice() {
+func DiscoverDevice() {
 
-	// don't do anything if the device is configured
-	if w.Context.Config.Device.Registered {
-		return
-	}
-
+	// Discover the device ID
 	found := false
 
 	// AWS - check the metadata service
@@ -194,8 +191,7 @@ func (w *Worker) DiscoverDevice() {
 						body, err := io.ReadAll(rsp.Body)
 						if err == nil {
 							InstanceID = string(body)
-							w.Context.Config.Device.InstanceID = string(body)
-							log.Infof("AWS Instance ID: %s", w.Context.Config.Device.InstanceID)
+							log.Infof("AWS Instance ID: %s", InstanceID)
 						}
 						rsp.Body.Close()
 						found = true
@@ -222,8 +218,7 @@ func (w *Worker) DiscoverDevice() {
 				body, err := io.ReadAll(rsp.Body)
 				if err == nil {
 					InstanceID = string(body)
-					w.Context.Config.Device.InstanceID = string(body)
-					log.Infof("Azure Instance ID: %s", w.Context.Config.Device.InstanceID)
+					log.Infof("Azure Instance ID: %s", InstanceID)
 				}
 				rsp.Body.Close()
 				found = true
@@ -243,8 +238,7 @@ func (w *Worker) DiscoverDevice() {
 				body, err := io.ReadAll(rsp.Body)
 				if err == nil {
 					InstanceID = string(body)
-					w.Context.Config.Device.InstanceID = string(body)
-					log.Infof("Oracle Instance ID: %s", w.Context.Config.Device.InstanceID)
+					log.Infof("Oracle Instance ID: %s", InstanceID)
 				}
 				rsp.Body.Close()
 				found = true
@@ -252,8 +246,28 @@ func (w *Worker) DiscoverDevice() {
 		}
 	}
 
-	if found {
-		SaveServer(w.Context)
+	// Google - check the metadata service
+	// GET http://metadata.google.internal/computeMetadata/v1/instance/id
+
+	if !found {
+		req, err := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/instance/id", nil)
+		if (err == nil) && (req != nil) {
+			req.Header.Set("Metadata-Flavor", "Google")
+			rsp, err := http.DefaultClient.Do(req)
+			if err == nil && rsp.StatusCode == 200 {
+				body, err := io.ReadAll(rsp.Body)
+				if err == nil {
+					InstanceID = string(body)
+					log.Infof("Google InstanceID: %s", InstanceID)
+				}
+				rsp.Body.Close()
+				found = true
+			}
+		}
+	}
+
+	if !found {
+		log.Info("Discovery found no InstanceID")
 	}
 
 }
@@ -290,6 +304,10 @@ func (w *Worker) CallNettica(etag *string) ([]byte, error) {
 
 	server := w.Context.Config.Device.Server
 
+	if InstanceID != "" {
+		w.Context.Config.Device.InstanceID = InstanceID
+	}
+
 	if !w.Context.Config.Device.Registered && (w.Context.Config.Device.InstanceID != "" || w.Context.Config.Device.EZCode != "") {
 		if strings.HasPrefix(w.Context.Config.Device.EZCode, "ez-") {
 			w.Context.Config.Device.Id = w.Context.Config.Device.EZCode
@@ -314,6 +332,8 @@ func (w *Worker) CallNettica(etag *string) ([]byte, error) {
 	host = strings.Replace(host, "https://", "", -1)
 	host = strings.Replace(host, "http://", "", -1)
 
+	// make a DNS lookup for the host server
+
 	answer, err := net.LookupIP(host)
 	if err != nil {
 		log.Errorf("DNS lookup for %s failed: %v", host, err)
@@ -331,8 +351,6 @@ func (w *Worker) CallNettica(etag *string) ([]byte, error) {
 	// Create a context with a 15 second timeout
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(15*time.Second))
 	defer cancel()
-
-	// make a DNS lookup for my.nettica.com
 
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
 	if err != nil {
@@ -1386,6 +1404,28 @@ func DoWork() {
 		err := LoadServers()
 		if err != nil {
 			log.Errorf("Error loading servers: %v", err)
+		}
+
+		if len(Servers) == 0 {
+			go DiscoverDevice()
+
+			var s = Server{}
+			var d = model.Device{}
+
+			d.Logging = "info"
+			d.OS = runtime.GOOS
+			d.Architecture = runtime.GOARCH
+			d.Enable = true
+			d.Registered = false
+			d.CheckInterval = 10
+			d.Version = Version
+			d.Server = "https://my.nettica.com"
+
+			s.Config.Device = &d
+
+			ss := NewServer("my.nettica.com", s.Config)
+			SaveServer(ss)
+
 		}
 
 		for _, s := range Servers {
