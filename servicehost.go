@@ -75,7 +75,7 @@ func StartServiceHost(s *Server, c chan bool) {
 			}
 			if req != nil {
 				req.Header.Set("X-API-KEY", s.Config.Device.ServiceApiKey)
-				req.Header.Set("User-Agent", "nettica-client/2.0")
+				req.Header.Set("User-Agent", "nettica-client/"+Version)
 				req.Header.Set("Content-Type", "application/json")
 				req.Header.Set("If-None-Match", etag)
 			}
@@ -204,7 +204,7 @@ func UpdateNetticaServiceHost(s *Server, service model.Service) error {
 	}
 	if req != nil {
 		req.Header.Set("X-API-KEY", service.ApiKey)
-		req.Header.Set("User-Agent", "nettica-client/2.0")
+		req.Header.Set("User-Agent", "nettica-client/"+Version)
 		req.Header.Set("Content-Type", "application/json")
 	}
 
