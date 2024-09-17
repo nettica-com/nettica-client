@@ -71,12 +71,6 @@ func (w *Worker) StartServer() {
 	log.Infof("Logging:   %s", w.Context.Config.Device.Logging)
 	log.Info("=====================================================")
 
-	if w.Context.Config.Device.Version != Version {
-		log.Infof("Device version now %s; UPDATING SERVER", Version)
-		w.Context.Config.Device.Version = Version
-		w.UpdateNetticaDevice(*w.Context.Config.Device)
-	}
-
 	for {
 		tick := <-w.Context.Running
 
@@ -94,7 +88,7 @@ func (w *Worker) StartServer() {
 			localIP = ip
 		}
 
-		etag, err = w.GetNetticaVPN(etag)
+		etag2, err := w.GetNetticaVPN(etag)
 		if err != nil {
 			log.Errorf("Error getting nettica message: %v", err)
 			success = false
@@ -120,6 +114,20 @@ func (w *Worker) StartServer() {
 			FailSafeActed = false
 			FailSafeMsgSent = false
 			Count = 0
+
+			// If this is the first iteration, update the device info if necessary
+			if etag == "" {
+				if w.Context.Config.Device.Version != Version {
+					log.Infof("Device version now %s; UPDATING SERVER", Version)
+					w.Context.Config.Device.Version = Version
+					w.Context.Config.Device.OS = runtime.GOOS
+					w.Context.Config.Device.Architecture = runtime.GOARCH
+					w.UpdateNetticaDevice(*w.Context.Config.Device)
+				}
+
+			}
+
+			etag = etag2
 		}
 	}
 }
