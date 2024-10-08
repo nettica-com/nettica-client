@@ -43,7 +43,7 @@ PrivateKey = {{ .Vpn.Current.PrivateKey }}
 {{ if .Vpn.Current.PreDown -}}PreDown = {{ .Vpn.Current.PreDown }}{{- end}}
 {{ if .Vpn.Current.PostDown -}}PostDown = {{ .Vpn.Current.PostDown }}{{- end}}
 {{ range .VPNs -}}
-{{ if .Enable || $service -}}
+{{ if or .Enable $service -}}
 {{ if $server }}
 # {{.Name}} / Updated: {{.Updated}} / Created: {{.Created}}
 [Peer]
