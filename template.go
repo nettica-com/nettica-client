@@ -33,7 +33,7 @@ PersistentKeepalive = {{.Host.Current.PersistentKeepalive}}
 Address = {{ . }}
   {{- end }}
 PrivateKey = {{ .Vpn.Current.PrivateKey }}
-{{ $server := .Vpn.Current.Endpoint -}}{{ $service := .Vpn.Current.Type -}}
+{{ $server := .Vpn.Current.Endpoint -}}{{ $service := .Vpn.Type -}}
 {{ if ne .Vpn.Current.ListenPort 0 -}}ListenPort = {{ .Vpn.Current.ListenPort }}{{- end}}
 {{ if .Vpn.Current.Dns }}DNS = {{ StringsJoin .Vpn.Current.Dns ", " }}{{ end }}
 {{ if .Vpn.Current.Table }}Table = {{ .Vpn.Current.Table }}{{- end}}
