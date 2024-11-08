@@ -27,7 +27,7 @@ PersistentKeepalive = {{.Host.Current.PersistentKeepalive}}
 `
 
 	wireguardTemplate = `{{ if .Vpn.Enable }}
-# {{.Vpn.Name }} / Updated: {{ .Vpn.Updated }} / Created: {{ .Vpn.Created }}
+# {{.Vpn.Name }}
 [Interface]
   {{- range .Vpn.Current.Address }}
 Address = {{ . }}
@@ -45,7 +45,7 @@ PrivateKey = {{ .Vpn.Current.PrivateKey }}
 {{ range .VPNs -}}
 {{ if or .Enable $service -}}
 {{ if $server }}
-# {{.Name}} / Updated: {{.Updated}} / Created: {{.Created}}
+# {{.Name}}
 [Peer]
 PublicKey = {{ .Current.PublicKey }}
 PresharedKey = {{ .Current.PresharedKey }}
@@ -54,7 +54,7 @@ AllowedIPs = {{ StringsJoin .Current.AllowedIPs ", " }}
 {{ if .Current.PersistentKeepalive -}}PersistentKeepalive = {{ .Current.PersistentKeepalive }}{{ end }}
 {{ else -}}
 {{ if .Current.Endpoint -}}
-# {{.Name}} / Updated: {{.Updated}} / Created: {{.Created}}
+# {{.Name}}
 [Peer]
 PublicKey = {{ .Current.PublicKey }}
 PresharedKey = {{ .Current.PresharedKey }}
