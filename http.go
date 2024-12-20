@@ -310,6 +310,8 @@ func deviceHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Access-Control-Allow-Origin", "*")
 	w.Header().Add("Access-Control-Allow-Methods", "*")
 
+	softDelete := false
+
 	// extract the net name from the url
 	parts := strings.Split(req.URL.Path, "/")
 	if len(parts) < 3 {
@@ -318,6 +320,10 @@ func deviceHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	deviceid := parts[2]
+
+	if len(parts) == 4 && parts[3] == "soft" {
+		softDelete = true
+	}
 
 	switch req.Method {
 	case "DELETE":
@@ -328,31 +334,35 @@ func deviceHandler(w http.ResponseWriter, req *http.Request) {
 			if s.Config.Device.Id == deviceid {
 				log.Infof("Found Device %s", deviceid)
 
-				// first delete all the VPNs associated with this device
-				vpn_configs := s.Config.Config
-				for _, vpn_config := range vpn_configs {
-					for _, vpn := range vpn_config.VPNs {
-						if vpn.DeviceID == deviceid {
-							log.Infof("Found VPN %s", vpn.Id)
-							err := s.Worker.DeleteVPN(vpn.Id)
-							if err != nil {
-								log.Error(err)
+				if !softDelete {
+
+					// if this is a hard delete ...
+					// first delete all the VPNs associated with this device
+					vpn_configs := s.Config.Config
+					for _, vpn_config := range vpn_configs {
+						for _, vpn := range vpn_config.VPNs {
+							if vpn.DeviceID == deviceid {
+								log.Infof("Found VPN %s", vpn.Id)
+								err := s.Worker.DeleteVPN(vpn.Id)
+								if err != nil {
+									log.Error(err)
+								}
 							}
 						}
 					}
+
+					// then delete the device from the server
+					err := s.Worker.DeleteDevice(deviceid)
+					if err != nil {
+						log.Error(err)
+					}
 				}
 
-				// then delete the device from the server
-
-				err := s.Worker.DeleteDevice(deviceid)
-				if err != nil {
-					log.Error(err)
-				}
-
+				// if this is a soft delete ...
 				// finally delete the server
 				s.Running <- false
 				delete(Servers, s.Path)
-				err = os.Remove(s.Path)
+				err := os.Remove(s.Path)
 				if err != nil {
 					log.Error(err)
 				}
