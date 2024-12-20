@@ -347,6 +347,9 @@ func deviceHandler(w http.ResponseWriter, req *http.Request) {
 								if err != nil {
 									log.Error(err)
 								}
+								// delete the key from the keystore
+								KeyDelete(vpn.Current.PublicKey)
+								KeySave()
 							}
 						}
 					}
