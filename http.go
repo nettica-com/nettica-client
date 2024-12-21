@@ -479,6 +479,10 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 						s.Config.Device.Id = device.Id
 					}
 
+					if device.Name != "" {
+						s.Config.Device.Name = device.Name
+					}
+
 					s.Config.Device.Logging = device.Logging
 					s.Config.Device.OS = runtime.GOOS
 					s.Config.Device.Architecture = runtime.GOARCH
