@@ -501,9 +501,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 						s.Config.Device.ApiKey = device.ApiKey
 					}
 
-					if device.Id != "" && strings.HasPrefix(device.Id, "device-") {
-						s.Config.Device.Id = device.Id
-					}
+					s.Config.Device.Id = device.Id
 
 					if device.Name != "" {
 						s.Config.Device.Name = device.Name
