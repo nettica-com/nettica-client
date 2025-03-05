@@ -319,7 +319,7 @@ func deviceHandler(w http.ResponseWriter, req *http.Request) {
 		io.WriteString(w, "")
 		return
 	}
-	deviceid := parts[2]
+	deviceid := Sanitize(parts[2])
 
 	if len(parts) == 4 && parts[3] == "soft" {
 		softDelete = true
@@ -407,7 +407,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case "GET":
 		log.Infof("Method: %s configHandler", req.Method)
-		Srvr := req.URL.Query().Get("server")
+		Srvr := Sanitize(req.URL.Query().Get("server"))
 		if Srvr == "undefined" {
 			Srvr = ""
 		}
@@ -562,7 +562,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// write the config back to the caller
-	io.WriteString(w, string(data))
+	io.Writer.Write(w, data)
 
 }
 

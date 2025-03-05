@@ -11,6 +11,8 @@ func Sanitize(s string) string {
 
 	// remove path and shell special characters
 	r := strings.NewReplacer(
+		"../", "",
+		"..\\", "",
 		"/", "",
 		"\\", "",
 		":", "",
