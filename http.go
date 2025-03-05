@@ -433,9 +433,14 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		}
 
 		device.Id = Sanitize(req.URL.Query().Get("id"))
-		if device.Id == "undefined" || !strings.HasPrefix(device.Id, "device-") {
-			device.Id = ""
+		if !strings.HasPrefix(device.Id, "device-") {
+			log.Errorf("Invalid device id: %s", device.Id)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"error": "Bad Request - Invalid device id"}`))
+			return
 		}
+
 		device.ApiKey = Sanitize(req.URL.Query().Get("apiKey"))
 		if device.ApiKey == "undefined" || !strings.HasPrefix(device.ApiKey, "device-api") {
 			device.ApiKey = ""
