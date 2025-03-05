@@ -13,6 +13,7 @@ func Sanitize(s string) string {
 	r := strings.NewReplacer(
 		"../", "",
 		"..\\", "",
+		"/#", "",
 		"..", "",
 		"/", "",
 		"\\", "",
