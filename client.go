@@ -122,7 +122,7 @@ func (w *Worker) StartServer() {
 					w.Context.Config.Device.Version = Version
 					w.Context.Config.Device.OS = runtime.GOOS
 					w.Context.Config.Device.Architecture = runtime.GOARCH
-					w.UpdateNetticaDevice(*w.Context.Config.Device)
+					w.UpdateNetticaDevice()
 				}
 
 			}
@@ -565,9 +565,9 @@ func (w *Worker) DeleteVPN(id string) error {
 
 }
 
-func (w *Worker) UpdateNetticaDevice(d model.Device) error {
+func (w *Worker) UpdateNetticaDevice() error {
 
-	switch d.Logging {
+	switch w.Context.Config.Device.Logging {
 	case "debug":
 		log.SetLevel(log.DebugLevel)
 	case "info":
@@ -578,14 +578,14 @@ func (w *Worker) UpdateNetticaDevice(d model.Device) error {
 		log.SetLevel(log.FatalLevel)
 	}
 
-	log.Infof("UPDATING DEVICE: %s (%s)", d.Name, d.Id)
+	log.Infof("UPDATING DEVICE: %s (%s)", w.Context.Config.Device.Name, w.Context.Config.Device.Id)
 
 	if w.Context.Config.Device.Server == "" || w.Context.Config.Device.AccountID == "" || w.Context.Config.Device.ApiKey == "" || w.Context.Config.Device.Id == "" {
 		return errors.New("skipping update, not enough information.  waiting for server to update us")
 	}
 
 	server := w.Context.Config.Device.Server
-	device := Sanitize(d.Id)
+	device := w.Context.Config.Device.Id
 
 	if w.Client == nil {
 		w.Client = GetHttpClient(server)
@@ -593,7 +593,7 @@ func (w *Worker) UpdateNetticaDevice(d model.Device) error {
 
 	var reqURL string = fmt.Sprintf(netticaDeviceAPIFmt, server, device)
 	log.Infof("  PATCH %s", reqURL)
-	content, err := json.Marshal(d)
+	content, err := json.Marshal(w.Context.Config.Device)
 	if err != nil {
 		return err
 	}

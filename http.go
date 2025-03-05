@@ -433,9 +433,6 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		}
 
 		device.Id = req.URL.Query().Get("id")
-		device.Id = strings.TrimPrefix(device.Id, "https://")
-		device.Id = strings.TrimPrefix(device.Id, "http://")
-		device.Id = strings.TrimSuffix(device.Id, "/")
 		device.Id = Sanitize(device.Id)
 
 		if device.Id == "undefined" || !strings.HasPrefix(device.Id, "device-") {
@@ -506,12 +503,11 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 						s.Config.Device.ApiKey = device.ApiKey
 					}
 
-					s.Config.Device.Id = device.Id
-
 					if device.Name != "" {
 						s.Config.Device.Name = device.Name
 					}
 
+					s.Config.Device.Id = device.Id
 					s.Config.Device.Logging = device.Logging
 					s.Config.Device.OS = runtime.GOOS
 					s.Config.Device.Architecture = runtime.GOARCH
@@ -520,7 +516,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 					s.Config.Device.Version = Version
 
 					SaveServer(s)
-					s.Worker.UpdateNetticaDevice(*s.Config.Device)
+					s.Worker.UpdateNetticaDevice()
 
 					break
 
