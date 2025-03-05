@@ -433,7 +433,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		}
 
 		device.Id = Sanitize(req.URL.Query().Get("id"))
-		if !strings.HasPrefix(device.Id, "device-") {
+		if !strings.HasPrefix(device.Id, "device-") || device.Id != req.URL.Query().Get("id") {
 			log.Errorf("Invalid device id: %s", device.Id)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Header().Set("Content-Type", "application/json")
