@@ -407,10 +407,31 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case "GET":
 		log.Infof("Method: %s configHandler", req.Method)
-		Srvr := Sanitize(req.URL.Query().Get("server"))
+		Srvr := req.URL.Query().Get("server")
 		if Srvr == "undefined" {
 			Srvr = ""
 		}
+		Srvr = strings.TrimSuffix(Srvr, "/")
+
+		// Complicated server name validation
+		// Trim http:// or https:// from the name,
+		// then sanitize the name, and if the sanitized name
+		// matches the original name, then it is a valid name
+
+		s := strings.ToLower(Srvr)
+		s = strings.TrimPrefix(s, "https://")
+		s = strings.TrimPrefix(s, "http://")
+
+		ss := Sanitize(s)
+
+		if ss != s {
+			log.Errorf("Invalid server name: %s", s)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"error": "Bad Request - Invalid server name"}`))
+			return
+		}
+
 		device.Id = Sanitize(req.URL.Query().Get("id"))
 		if device.Id == "undefined" || !strings.HasPrefix(device.Id, "device-") {
 			device.Id = ""
