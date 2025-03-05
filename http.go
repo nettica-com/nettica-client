@@ -433,8 +433,10 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		}
 
 		device.Id = req.URL.Query().Get("id")
+		device.Id = strings.TrimPrefix(device.Id, "https://")
+		device.Id = strings.TrimPrefix(device.Id, "http://")
+		device.Id = strings.TrimSuffix(device.Id, "/")
 		device.Id = Sanitize(device.Id)
-		device.Id = strings.Clone(device.Id)
 
 		if device.Id == "undefined" || !strings.HasPrefix(device.Id, "device-") {
 			log.Errorf("Invalid device id: %s", device.Id)
