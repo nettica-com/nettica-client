@@ -130,14 +130,14 @@ func SaveServer(server *Server) {
 
 func CleanupName(name string) string {
 
+	name = strings.ToLower(name)
+
 	// remove the https:// or http:// from the name if it exists
-	if strings.ToLower(name[:8]) == "https://" {
+	if strings.HasPrefix(name, "https://") {
 		name = name[8:]
-	} else if strings.ToLower(name[:7]) == "http://" {
+	} else if strings.HasPrefix(name, "http://") {
 		name = name[7:]
 	}
-
-	name = strings.ToLower(name)
 
 	return Sanitize(name)
 }
