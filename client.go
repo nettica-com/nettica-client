@@ -585,12 +585,13 @@ func (w *Worker) UpdateNetticaDevice(d model.Device) error {
 	}
 
 	server := w.Context.Config.Device.Server
+	device := Sanitize(d.Id)
 
 	if w.Client == nil {
 		w.Client = GetHttpClient(server)
 	}
 
-	var reqURL string = fmt.Sprintf(netticaDeviceAPIFmt, server, d.Id)
+	var reqURL string = fmt.Sprintf(netticaDeviceAPIFmt, server, device)
 	log.Infof("  PATCH %s", reqURL)
 	content, err := json.Marshal(d)
 	if err != nil {
