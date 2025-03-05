@@ -432,7 +432,10 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		device.Id = Sanitize(req.URL.Query().Get("id"))
+		device.Id = req.URL.Query().Get("id")
+		device.Id = Sanitize(device.Id)
+		device.Id = strings.Clone(device.Id)
+
 		if device.Id == "undefined" || !strings.HasPrefix(device.Id, "device-") {
 			log.Errorf("Invalid device id: %s", device.Id)
 			w.WriteHeader(http.StatusBadRequest)
