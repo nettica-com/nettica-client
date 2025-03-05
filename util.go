@@ -29,7 +29,15 @@ func Sanitize(s string) string {
 		"@", "",
 		"!", "",
 	)
-	return r.Replace(s)
+
+	// Repeat replacement until `s` no longer changes.
+	for {
+		n := r.Replace(s)
+		if n == s {
+			return n // No change, return the result.
+		}
+		s = n // Update `s` for the next iteration.
+	}
 }
 
 // function compares two devices and returns true if they are the same
