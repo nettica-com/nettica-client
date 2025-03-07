@@ -119,6 +119,8 @@ func StartContainer(service model.Service) (string, error) {
 	port := fmt.Sprintf("%d", service.ServicePort)
 
 	var args = []string{"run", "--rm", "-d", "--cap-add", "NET_ADMIN", "--sysctl", "net.ipv4.conf.all.src_valid_mark=1",
+		"--tmpfs", "/etc/nettica:rw,noexec,nosuid,size=50m",
+		"--tmpfs", "/etc/wireguard:rw,noexec,nosuid,size=50m",
 		"-e", "NETTICA_SERVER=" + service.Device.Server,
 		"-e", "NETTICA_DEVICE_ID=" + service.Device.Id,
 		"-e", "NETTICA_API_KEY=" + service.Device.ApiKey,
