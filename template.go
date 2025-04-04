@@ -32,7 +32,7 @@ PersistentKeepalive = {{.Host.Current.PersistentKeepalive}}
   {{- range .Vpn.Current.Address }}
 Address = {{ . }}
   {{- end }}
-PrivateKey = {{ .Vpn.Current.PrivateKey }}
+PrivateKey = {{ .Key }}
 {{ $server := .Vpn.Current.Endpoint -}}{{ $service := .Vpn.Type -}}
 {{ if ne .Vpn.Current.ListenPort 0 -}}ListenPort = {{ .Vpn.Current.ListenPort }}{{- end}}
 {{ if .Vpn.Current.Dns }}DNS = {{ StringsJoin .Vpn.Current.Dns ", " }}{{ end }}
@@ -69,16 +69,18 @@ AllowedIPs = {{ StringsJoin .Current.AllowedIPs ", " }}
 )
 
 // DumpWireguardConfig using go template
-func DumpWireguardConfig(vpn *model.VPN, VPNs *[]model.VPN) ([]byte, error) {
+func DumpWireguardConfig(key string, vpn *model.VPN, VPNs *[]model.VPN) ([]byte, error) {
 	t, err := template.New("wireguard").Funcs(template.FuncMap{"StringsJoin": strings.Join}).Parse(wireguardTemplate)
 	if err != nil {
 		return nil, err
 	}
 
 	return dump(t, struct {
+		Key  string
 		Vpn  *model.VPN
 		VPNs *[]model.VPN
 	}{
+		Key:  key,
 		Vpn:  vpn,
 		VPNs: VPNs,
 	})

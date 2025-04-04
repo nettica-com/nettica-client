@@ -966,7 +966,7 @@ func (w *Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 
 				// Check to see if we have a private key for this public key
 				key, found := KeyLookup(vpn.Current.PublicKey)
-				if !found {
+				if !found && vpn.Current.PrivateKey != "" {
 					KeyAdd(vpn.Current.PublicKey, vpn.Current.PrivateKey)
 					err = KeySave()
 					if err != nil {
@@ -988,9 +988,9 @@ func (w *Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 					// delete the old public key
 					KeyDelete(vpn.Current.PublicKey)
 					wg, _ := wgtypes.GeneratePrivateKey()
-					vpn.Current.PrivateKey = wg.String()
+					key = wg.String()
 					vpn.Current.PublicKey = wg.PublicKey().String()
-					KeyAdd(vpn.Current.PublicKey, vpn.Current.PrivateKey)
+					KeyAdd(vpn.Current.PublicKey, key)
 					KeySave()
 
 					vpn2 := vpn
@@ -999,12 +999,10 @@ func (w *Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 					// Update nettica with the new public key
 					w.UpdateVPN(&vpn2)
 
-				} else {
-					vpn.Current.PrivateKey = key
 				}
 
 				// Create a new NetName.conf configuration file
-				text, err := DumpWireguardConfig(&vpn, &vpns)
+				text, err := DumpWireguardConfig(key, &vpn, &vpns)
 				if err != nil {
 					log.Errorf("error on template: %s", err)
 				}
