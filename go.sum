@@ -61,6 +61,8 @@ github.com/goccy/go-json v0.10.5 h1:Fq85nIqj+gXn/S5ahsiTlK3TmC85qgirsdTP/+DeaC4=
 github.com/goccy/go-json v0.10.5/go.mod h1:oq7eo15ShAhp70Anwd5lgX2pLfOS3QCiwU/PULtXL6M=
 github.com/golang-jwt/jwt v3.2.2+incompatible h1:IfV12K8xAKAnZqdXVzCZ+TOjboZ2keLg81eXfW3O+oY=
 github.com/golang-jwt/jwt v3.2.2+incompatible/go.mod h1:8pz2t5EyA70fFQQSrl6XZXzqecmYZeUEB8OUGHkxJ+I=
+github.com/golang-jwt/jwt/v4 v4.5.2 h1:YtQM7lnr8iZ+j5q71MGKkNw9Mn7AjHM68uc9g5fXeUI=
+github.com/golang-jwt/jwt/v4 v4.5.2/go.mod h1:m21LjoU+eqJr34lmDMbreY2eSTRJ1cv77w39/MY0Ch0=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/google/gofuzz v1.0.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
@@ -109,6 +111,8 @@ github.com/nettica-com/nettica-admin v0.0.0-20250227085313-e48c77356310 h1:+Nfdy
 github.com/nettica-com/nettica-admin v0.0.0-20250227085313-e48c77356310/go.mod h1:5E/XeplNR84QBy0lcrMeApJP83eqtqGqCqcje/AOcro=
 github.com/nettica-com/nettica-admin v0.0.0-20250404162650-f4f021ddf84b h1:9Qs+8AMx+f2WqQ+/jg0aF1btvL+qjTOnyIzhPgU8Ga8=
 github.com/nettica-com/nettica-admin v0.0.0-20250404162650-f4f021ddf84b/go.mod h1:lLy/QeGX+urvb3OsxbDJjDqqqFU9sPyRNTuyDPZiEXI=
+github.com/nettica-com/nettica-admin v0.0.0-20250405053136-3ebcf92906ae h1:SBgT+w8fU+nHHB3dyxagrEpk5Yd8jd0OEAWZKTVx6u0=
+github.com/nettica-com/nettica-admin v0.0.0-20250405053136-3ebcf92906ae/go.mod h1:KYulaSVFxrwFr+FjS+wykub3deHDnorrHkPMc/gVb+Q=
 github.com/pelletier/go-toml/v2 v2.2.2 h1:aYUidT7k73Pcl9nb2gScu7NSrKCSHIDE89b3+6Wq+LM=
 github.com/pelletier/go-toml/v2 v2.2.2/go.mod h1:1t835xjRzz80PqgE6HHgN2JOsmgYu/h4qDAS4n929Rs=
 github.com/pelletier/go-toml/v2 v2.2.3 h1:YmeHyLY8mFWbdkNWwpr+qIL2bEqT0o95WSdkNHvL12M=

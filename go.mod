@@ -7,7 +7,7 @@ toolchain go1.24.0
 require (
 	github.com/huin/goupnp v1.3.0
 	github.com/miekg/dns v1.1.64
-	github.com/nettica-com/nettica-admin v0.0.0-20250404162650-f4f021ddf84b
+	github.com/nettica-com/nettica-admin v0.0.0-20250405053136-3ebcf92906ae
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/sys v0.31.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20241231184526-a9ab2273dd10
@@ -26,6 +26,7 @@ require (
 	github.com/go-playground/validator/v10 v10.26.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
