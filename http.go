@@ -514,6 +514,11 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 					s.Config.Device.Enable = true
 					s.Config.Device.CheckInterval = 10
 					s.Config.Device.Version = Version
+					if cfg.UpdateKeys {
+						s.Config.Device.UpdateKeys = true
+					} else {
+						s.Config.Device.UpdateKeys = false
+					}
 
 					SaveServer(s)
 					s.Worker.UpdateNetticaDevice()

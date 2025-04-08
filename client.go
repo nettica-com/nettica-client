@@ -122,6 +122,11 @@ func (w *Worker) StartServer() {
 					w.Context.Config.Device.Version = Version
 					w.Context.Config.Device.OS = runtime.GOOS
 					w.Context.Config.Device.Architecture = runtime.GOARCH
+					if cfg.UpdateKeys {
+						w.Context.Config.Device.UpdateKeys = true
+					} else {
+						w.Context.Config.Device.UpdateKeys = false
+					}
 					w.UpdateNetticaDevice()
 				}
 
