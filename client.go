@@ -964,43 +964,48 @@ func (w *Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 					}
 				}
 
-				// Check to see if we have a private key for this public key
-				key, found := KeyLookup(vpn.Current.PublicKey)
-				if !found && vpn.Current.PrivateKey != "" {
-					KeyAdd(vpn.Current.PublicKey, vpn.Current.PrivateKey)
-					err = KeySave()
-					if err != nil {
-						log.Errorf("Error saving key: %s %s", vpn.Current.PublicKey, vpn.Current.PrivateKey)
-					}
-
-					if w.Context.Config.Device.UpdateKeys {
-						// clear out the private key and update the server
-						vpn2 := vpn
-						vpn2.Current.PrivateKey = ""
-						w.UpdateVPN(&vpn2)
-					}
-
-					key, _ = KeyLookup(vpn.Current.PublicKey)
-				}
-
-				// If the private key is blank create a new one and update the server
-				if key == "" {
-					// delete the old public key
-					KeyDelete(vpn.Current.PublicKey)
+				key := ""
+				// If the server has sent us a private key, and we're configured to update keys,
+				// then we need to generate a new key pair and update the server
+				if w.Context.Config.Device.UpdateKeys && vpn.Current.PublicKey != "" && vpn.Current.PrivateKey != "" {
 					wg, _ := wgtypes.GeneratePrivateKey()
 					key = wg.String()
 					vpn.Current.PublicKey = wg.PublicKey().String()
+					vpn.Current.PrivateKey = ""
 					KeyAdd(vpn.Current.PublicKey, key)
 					KeySave()
-
-					vpn2 := vpn
-					vpn2.Current.PrivateKey = ""
-
-					// Update nettica with the new public key
-					w.UpdateVPN(&vpn2)
-
+					w.UpdateVPN(&vpn)
+					log.Infof("Key updated for %s", vpn.Name)
 				}
 
+				if !w.Context.Config.Device.UpdateKeys && vpn.Current.PublicKey != "" && vpn.Current.PrivateKey != "" {
+					key = vpn.Current.PrivateKey
+				}
+
+				if key == "" {
+					found := false
+					// Check to see if we have a private key for this public key
+					key, found = KeyLookup(vpn.Current.PublicKey)
+
+					// If the private key is blank create a new one and update the server
+					if key == "" || !found {
+						// delete the old public key
+						KeyDelete(vpn.Current.PublicKey)
+						wg, _ := wgtypes.GeneratePrivateKey()
+						key = wg.String()
+						vpn.Current.PublicKey = wg.PublicKey().String()
+						vpn.Current.PrivateKey = ""
+						KeyAdd(vpn.Current.PublicKey, key)
+						KeySave()
+
+						// Update nettica with the new public key
+						w.UpdateVPN(&vpn)
+					} else {
+						// we now have the private key
+					}
+				}
+
+				// Create a new WireGuard configuration file with the private key
 				// Create a new NetName.conf configuration file
 				text, err := DumpWireguardConfig(key, &vpn, &vpns)
 				if err != nil {
@@ -1132,9 +1137,11 @@ func (w *Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 						log.Errorf("Error creating directory %s : %s", path, err)
 					}
 
-					err = os.WriteFile(path+name+".conf", text, 0600)
-					if err != nil {
-						log.Errorf("Error writing file %s : %s", path+name+".conf", err)
+					if len(text) > 0 {
+						err = os.WriteFile(path+name+".conf", text, 0600)
+						if err != nil {
+							log.Errorf("Error writing file %s : %s", path+name+".conf", err)
+						}
 					}
 
 					if !vpn.Enable {
