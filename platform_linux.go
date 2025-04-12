@@ -126,7 +126,9 @@ func StartContainer(service model.Service) (string, error) {
 		"-e", "NETTICA_API_KEY=" + service.Device.ApiKey,
 		"-e", "NETTICA_UPDATE_KEYS=false",
 		"-e", "NETTICA_SERVICE_HOST=true",
-		"-p", port + ":" + port + "/udp", "nettica-client"} // TODO: change nettica-client to nettica/nettica-client
+		"-p", port + ":" + port + "/udp",
+		"--name", service.Device.Id,
+		"nettica-client"} // TODO: change nettica-client to nettica/nettica-client
 	cmd := exec.Command("docker", args...)
 	log.Infof("Starting container: %v", cmd)
 
