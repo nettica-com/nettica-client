@@ -9,12 +9,24 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var (
+	lastDNS  string
+	lastInfo string
+)
+
 // Notify sends a message to 127.0.0.1:25264, the Nettica Agent app
 
 func NotifyDNS(name string) {
 	var note model.AgentNotification
 	note.Type = "dns"
 	note.Text = name
+
+	if name == lastDNS {
+		log.Debugf("Skipping duplicate DNS notification: %s", name)
+		return
+	}
+
+	lastDNS = name
 
 	bytes, err := json.Marshal(note)
 	if err != nil {
@@ -32,6 +44,13 @@ func NotifyInfo(message string) {
 	var note model.AgentNotification
 	note.Type = "info"
 	note.Text = message
+
+	if message == lastInfo {
+		log.Debugf("Skipping duplicate info notification: %s", message)
+		return
+	}
+
+	lastInfo = message
 
 	bytes, err := json.Marshal(note)
 	if err != nil {
