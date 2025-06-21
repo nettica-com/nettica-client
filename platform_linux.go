@@ -118,7 +118,17 @@ func StartContainer(service model.Service) (string, error) {
 
 	port := fmt.Sprintf("%d", service.ServicePort)
 
-	var args = []string{"run", "--rm", "-d", "--cap-add", "NET_ADMIN", "--sysctl", "net.ipv4.conf.all.src_valid_mark=1",
+	var args = []string{"run", "--rm", "-d",
+		"--cap-add", "NET_ADMIN",
+		"--sysctl", "net.ipv4.conf.all.src_valid_mark=1",
+		"--sysctl", "net.ipv4.tcp_congestion_control=bbr",
+		"--sysctl", "net.core.default_qdisc=fq",
+		"--sysctl", "net.core.rmem_max=16777216",
+		"--sysctl", "net.core.wmem_max=16777216",
+		"--sysctl", "net.ipv4.tcp_rmem=4096 87380 16777216",
+		"--sysctl", "net.ipv4.tcp_wmem=4096 87380 16777216",
+		"--sysctl", "net.ipv4.tcp_ecn=1",
+		"--sysctl", "net.ipv4.tcp_fastopen=3",
 		"--tmpfs", "/etc/nettica:rw,noexec,nosuid,size=50m",
 		"--tmpfs", "/etc/wireguard:rw,noexec,nosuid,size=50m",
 		"-e", "NETTICA_SERVER=" + service.Device.Server,
