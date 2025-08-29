@@ -352,6 +352,7 @@ func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 			m := new(dns.Msg)
 			m.SetReply(r)
 			m.Compress = true
+			m.RecursionAvailable = true
 
 			if r.Question[0].Qtype == dns.TypePTR {
 				rr = &dns.PTR{Hdr: dns.RR_Header{Name: r.Question[0].Name,
@@ -489,6 +490,7 @@ func QueryDNS(w dns.ResponseWriter, query *dns.Msg) {
 			if err == nil {
 
 				if response.Rcode == dns.RcodeSuccess {
+					response.RecursionAvailable = true
 					w.WriteMsg(response)
 					return
 				}
@@ -503,19 +505,23 @@ func QueryDNS(w dns.ResponseWriter, query *dns.Msg) {
 
 	if fBLockSearch {
 		log.Infof("--- Query to SearchDomains blocked: %s", q)
-		query.Authoritative = true
+		// query.Authoritative = true
+		query.RecursionAvailable = true
 		query.Rcode = dns.RcodeNameError
 		w.WriteMsg(query)
 		return
 	}
 	if fBlackhole {
 		log.Infof("--- Query to Blackhole blocked: %s", q)
-		query.Authoritative = true
+		// query.Authoritative = true
+		query.RecursionAvailable = true
 		query.Rcode = dns.RcodeNameError
 		w.WriteMsg(query)
 		return
 	}
 
+	// query.Authoritative = true
+	query.RecursionAvailable = true
 	query.Rcode = dns.RcodeServerFailure
 	w.WriteMsg(query)
 }
