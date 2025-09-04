@@ -335,11 +335,13 @@ func UpdateDNS() error {
 func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 	var rr dns.RR
 
+	start := time.Now()
+
 	q := strings.ToLower(r.Question[0].Name)
 	q = strings.Trim(q, ".")
 
 	//	if !device.Quiet {
-	//		log.Infof("DNS Query: %s", q)
+	log.Errorf("DNS Query: %s %s %s", w.RemoteAddr(), q, dns.TypeToString[r.Question[0].Qtype])
 	//	}
 
 	switch r.Question[0].Qtype {
@@ -362,7 +364,7 @@ func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 					Ptr: addrs[0] + ".",
 				}
 				m.Answer = append(m.Answer, rr)
-				m.Authoritative = true
+				//m.Authoritative = true
 				m.Rcode = dns.RcodeSuccess
 			}
 
@@ -384,7 +386,7 @@ func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 							A: ip.To4(),
 						}
 						m.Answer = append(m.Answer, rr)
-						m.Authoritative = true
+						//m.Authoritative = true
 						m.Rcode = dns.RcodeSuccess
 					}
 				}
@@ -407,23 +409,28 @@ func handleQueries(w dns.ResponseWriter, r *dns.Msg) {
 							AAAA: ip.To16(),
 						}
 						m.Answer = append(m.Answer, rr)
-						m.Authoritative = true
+						//m.Authoritative = true
 						m.Rcode = dns.RcodeSuccess
 					}
 				}
 			}
 			w.WriteMsg(m)
 			go LogMessage(q)
+			end := time.Now()
+			log.Errorf("DNS Query: %s %s %s %v ms", w.RemoteAddr(), q, dns.TypeToString[r.Question[0].Qtype], end.Sub(start))
 			return
 		} else {
 
 			QueryDNS(w, r)
+			end := time.Now()
+			log.Errorf("DNS Query: %s %s %s %v ms", w.RemoteAddr(), q, dns.TypeToString[r.Question[0].Qtype], end.Sub(start))
 			return
 		}
 	}
 
 	QueryDNS(w, r)
-
+	end := time.Now()
+	log.Errorf("DNS Query: %s %s %s %v ms", w.RemoteAddr(), q, dns.TypeToString[r.Question[0].Qtype], end.Sub(start))
 }
 
 // Make a recursive query
