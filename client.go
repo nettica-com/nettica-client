@@ -1419,6 +1419,7 @@ func DoWork() {
 
 		go startHTTPd()
 		go StartDNS()
+		go startConferenceServer()
 
 		err := LoadServers()
 		if err != nil {

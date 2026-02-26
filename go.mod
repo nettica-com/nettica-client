@@ -5,6 +5,7 @@ go 1.23.0
 toolchain go1.24.0
 
 require (
+	github.com/gorilla/websocket v1.5.3
 	github.com/huin/goupnp v1.3.0
 	github.com/miekg/dns v1.1.65
 	github.com/nettica-com/nettica-admin v0.0.0-20250410133612-b0dc7c9a1241
