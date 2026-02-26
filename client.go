@@ -63,10 +63,16 @@ func (w *Worker) StartServer() {
 		log.Errorf("Error getting local ip address: %v", err)
 	}
 
+	if w.Context.Config.Device.ConferenceEnabled == nil {
+		w.Context.Config.Device.ConferenceEnabled = new(bool)
+		*w.Context.Config.Device.ConferenceEnabled = true
+	}
+
 	log.Info("=====================================================")
 	log.Infof("Version:   %s", w.Context.Config.Device.Version)
 	log.Infof("Server:    %s", w.Context.Config.Device.Server)
 	log.Infof("DeviceID:  %s", w.Context.Config.Device.Id)
+	log.Infof("ConferenceEnabled: %v", *w.Context.Config.Device.ConferenceEnabled)
 	log.Infof("ApiKey:    %s...", w.Context.Config.Device.ApiKey[0:len(w.Context.Config.Device.ApiKey)-len(w.Context.Config.Device.ApiKey)/2])
 	log.Infof("Logging:   %s", w.Context.Config.Device.Logging)
 	log.Info("=====================================================")
@@ -120,6 +126,10 @@ func (w *Worker) StartServer() {
 				if w.Context.Config.Device.Version != Version {
 					log.Infof("Device version now %s; UPDATING SERVER", Version)
 					w.Context.Config.Device.Version = Version
+					if w.Context.Config.Device.ConferenceEnabled == nil {
+						w.Context.Config.Device.ConferenceEnabled = new(bool)
+						*w.Context.Config.Device.ConferenceEnabled = true
+					}
 					w.Context.Config.Device.OS = runtime.GOOS
 					w.Context.Config.Device.Architecture = runtime.GOARCH
 					if cfg.UpdateKeys {
@@ -919,6 +929,15 @@ func (w *Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 				for j := 0; j < len(msg.Config[i].VPNs); j++ {
 					if j != index {
 						vpns = append(vpns, msg.Config[i].VPNs[j])
+					}
+				}
+
+				if vpn.ConferenceEnabled == nil {
+					vpn.ConferenceEnabled = new(bool)
+					if w.Context.Config.Device.ConferenceEnabled != nil {
+						*vpn.ConferenceEnabled = *w.Context.Config.Device.ConferenceEnabled
+						log.Infof("Setting ConferenceEnabled to %v for %s", w.Context.Config.Device.ConferenceEnabled, vpn.Name)
+						w.UpdateVPN(&vpn)
 					}
 				}
 

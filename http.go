@@ -396,13 +396,13 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	device.Version = Version
 	device.OS = runtime.GOOS
 	device.Architecture = runtime.GOARCH
-	device.Version = Version
 	device.Enable = true
 	device.CheckInterval = 10
 	device.Name, _ = os.Hostname()
 	device.SourceAddress = "0.0.0.0"
 	device.InstanceID = InstanceID
 	device.Logging = ""
+	device.ConferenceEnabled = boolPtr(true)
 
 	switch req.Method {
 	case "GET":
@@ -514,6 +514,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 					s.Config.Device.Enable = true
 					s.Config.Device.CheckInterval = 10
 					s.Config.Device.Version = Version
+					s.Config.Device.ConferenceEnabled = device.ConferenceEnabled
 					if cfg.UpdateKeys {
 						s.Config.Device.UpdateKeys = true
 					} else {
@@ -594,6 +595,10 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	// write the config back to the caller
 	io.Writer.Write(w, data)
 
+}
+
+func boolPtr(true bool) *bool {
+	panic("unimplemented")
 }
 
 func startHTTPd() {
