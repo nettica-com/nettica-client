@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -14,41 +13,65 @@ import (
 )
 
 const maxPeersPerRoom = 5
-const conferenceAddr = "0.0.0.0:3000"
+const conferenceAddr = "0.0.0.0:3001"
 
-// SignalMessage is the envelope used for all WebRTC signaling messages.
+// PeerInfo is the lightweight peer descriptor used in room_state and peer_joined.
+type PeerInfo struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Avatar string `json:"avatar,omitempty"`
+}
+
+// SignalMessage is the envelope for all WebRTC signaling messages.
 //
-// Client → Server message types:
+// Client → Server:
 //
-//	"offer"         { to, payload }  – relay SDP offer to a specific peer
-//	"answer"        { to, payload }  – relay SDP answer to a specific peer
-//	"ice-candidate" { to, payload }  – relay ICE candidate to a specific peer
+//	"join"      { roomId, name, avatar }
+//	"offer"     { to, sdp }
+//	"answer"    { to, sdp }
+//	"candidate" { to, candidate, sdpMid, sdpMLineIndex }
+//	"leave"
 //
-// Server → Client message types:
+// Server → Client:
 //
-//	"joined"        { peerId, existingPeers }  – sent to the joining peer
-//	"peer-joined"   { from }                   – broadcast when a new peer arrives
-//	"peer-left"     { from }                   – broadcast when a peer disconnects
-//	"offer"         { from, payload }           – relayed SDP offer
-//	"answer"        { from, payload }           – relayed SDP answer
-//	"ice-candidate" { from, payload }           – relayed ICE candidate
-//	"error"         { message }                 – e.g. room full
+//	"welcome"    { id }
+//	"room_state" { peers:[{id,name,avatar}] }
+//	"peer_joined"{ id, name, avatar }
+//	"peer_left"  { id }
+//	"offer"      { from, sdp }
+//	"answer"     { from, sdp }
+//	"candidate"  { from, candidate, sdpMid, sdpMLineIndex }
+//	"error"      { message }
 type SignalMessage struct {
-	Type          string          `json:"type"`
-	PeerID        string          `json:"peerId,omitempty"`
-	ExistingPeers []string        `json:"existingPeers,omitempty"`
-	From          string          `json:"from,omitempty"`
-	To            string          `json:"to,omitempty"`
-	Payload       json.RawMessage `json:"payload,omitempty"`
-	Message       string          `json:"message,omitempty"`
+	Type   string `json:"type"`
+	// Identity / room
+	ID     string `json:"id,omitempty"`
+	RoomID string `json:"roomId,omitempty"`
+	Name   string `json:"name,omitempty"`
+	Avatar string `json:"avatar,omitempty"`
+	// Room state
+	Peers []PeerInfo `json:"peers,omitempty"`
+	// Relay routing
+	From string `json:"from,omitempty"`
+	To   string `json:"to,omitempty"`
+	// SDP (offer / answer)
+	SDP string `json:"sdp,omitempty"`
+	// ICE candidate
+	Candidate     string  `json:"candidate,omitempty"`
+	SdpMid        *string `json:"sdpMid,omitempty"`
+	SdpMLineIndex *int    `json:"sdpMLineIndex,omitempty"`
+	// Error
+	Message string `json:"message,omitempty"`
 }
 
 // peer represents a single connected WebSocket client.
 type peer struct {
-	id   string
-	conn *websocket.Conn
-	send chan []byte
-	mu   sync.Mutex // guards conn writes
+	id     string
+	name   string
+	avatar string
+	conn   *websocket.Conn
+	send   chan []byte
+	mu     sync.Mutex // guards conn writes
 }
 
 // room holds all peers currently in a conference room.
@@ -74,17 +97,17 @@ func (r *room) remove(id string) {
 	delete(r.peers, id)
 }
 
-// peerIDs returns the IDs of all peers except the one to exclude.
-func (r *room) peerIDs(exclude string) []string {
+// peerInfos returns PeerInfo for all peers except the one to exclude.
+func (r *room) peerInfos(exclude string) []PeerInfo {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	ids := make([]string, 0, len(r.peers))
-	for id := range r.peers {
+	infos := make([]PeerInfo, 0, len(r.peers))
+	for id, p := range r.peers {
 		if id != exclude {
-			ids = append(ids, id)
+			infos = append(infos, PeerInfo{ID: p.id, Name: p.name, Avatar: p.avatar})
 		}
 	}
-	return ids
+	return infos
 }
 
 func (r *room) size() int {
@@ -222,27 +245,14 @@ func (p *peer) writePump() {
 	}
 }
 
-// conferenceHandler handles WebSocket connections at /room/{roomId}.
+// conferenceHandler handles WebSocket connections at /.
+// The client sends a "join" message first to specify the room and identity.
 func conferenceHandler(w http.ResponseWriter, r *http.Request) {
-	// Parse roomId from path: /room/{roomId}
-	parts := strings.SplitN(strings.TrimPrefix(r.URL.Path, "/"), "/", 2)
-	if len(parts) != 2 || parts[0] != "room" || parts[1] == "" {
-		http.Error(w, `invalid path – use /room/{roomId}`, http.StatusBadRequest)
-		return
-	}
-	roomID := Sanitize(parts[1])
-	if roomID == "" {
-		http.Error(w, "invalid room ID", http.StatusBadRequest)
-		return
-	}
-
 	conn, err := wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Errorf("conference: WebSocket upgrade failed: %v", err)
 		return
 	}
-
-	rm := conference.getOrCreate(roomID)
 
 	p := &peer{
 		id:   generatePeerID(),
@@ -250,44 +260,76 @@ func conferenceHandler(w http.ResponseWriter, r *http.Request) {
 		send: make(chan []byte, 64),
 	}
 
+	go p.writePump()
+
+	// Wait for the "join" message to learn which room and who the peer is.
+	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	_, data, err := conn.ReadMessage()
+	if err != nil {
+		log.Debugf("conference: no join message received: %v", err)
+		close(p.send)
+		return
+	}
+
+	var join SignalMessage
+	if err := json.Unmarshal(data, &join); err != nil || join.Type != "join" || join.RoomID == "" {
+		sendJSON(p, SignalMessage{Type: "error", Message: "first message must be {type:join, roomId:…}"})
+		conn.Close()
+		close(p.send)
+		return
+	}
+
+	roomID := Sanitize(join.RoomID)
+	if roomID == "" {
+		sendJSON(p, SignalMessage{Type: "error", Message: "invalid room ID"})
+		conn.Close()
+		close(p.send)
+		return
+	}
+
+	p.name = join.Name
+	p.avatar = join.Avatar
+
+	rm := conference.getOrCreate(roomID)
+
 	if !rm.add(p) {
-		sendJSON(p, SignalMessage{
-			Type:    "error",
-			Message: "room is full (maximum 5 users)",
-		})
-		// Flush the message before closing
+		sendJSON(p, SignalMessage{Type: "error", Message: "room is full (maximum 5 users)"})
+		// Flush the error before closing.
 		if msg, ok := <-p.send; ok {
 			conn.WriteMessage(websocket.TextMessage, msg) //nolint:errcheck
 		}
 		conn.Close()
+		close(p.send)
 		log.Infof("conference: peer rejected – room %s is full", roomID)
 		return
 	}
 
-	log.Infof("conference: peer %s joined room %s (%d/%d)",
-		p.id, roomID, rm.size(), maxPeersPerRoom)
+	log.Infof("conference: peer %s (%s) joined room %s (%d/%d)",
+		p.id, p.name, roomID, rm.size(), maxPeersPerRoom)
 
-	// Tell the new peer its ID and who is already in the room.
-	existing := rm.peerIDs(p.id)
-	if existing == nil {
-		existing = []string{}
+	// Tell the new peer its assigned ID.
+	sendJSON(p, SignalMessage{Type: "welcome", ID: p.id})
+
+	// Send the current room roster so the client can initiate offers.
+	infos := rm.peerInfos(p.id)
+	if infos == nil {
+		infos = []PeerInfo{}
 	}
-	sendJSON(p, SignalMessage{
-		Type:          "joined",
-		PeerID:        p.id,
-		ExistingPeers: existing,
-	})
+	sendJSON(p, SignalMessage{Type: "room_state", Peers: infos})
 
 	// Tell everyone else that a new peer has arrived.
-	notify, _ := json.Marshal(SignalMessage{Type: "peer-joined", From: p.id})
-	rm.broadcast(notify, p.id)
+	joined, _ := json.Marshal(SignalMessage{
+		Type:   "peer_joined",
+		ID:     p.id,
+		Name:   p.name,
+		Avatar: p.avatar,
+	})
+	rm.broadcast(joined, p.id)
 
-	go p.writePump()
-
-	// Read pump – runs on this goroutine until the connection closes.
+	// Read pump – runs on this goroutine until the connection closes or "leave".
 	defer func() {
 		rm.remove(p.id)
-		left, _ := json.Marshal(SignalMessage{Type: "peer-left", From: p.id})
+		left, _ := json.Marshal(SignalMessage{Type: "peer_left", ID: p.id})
 		rm.broadcast(left, p.id)
 		close(p.send)
 		conn.Close()
@@ -318,17 +360,28 @@ func conferenceHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Always stamp the sender's ID so the receiver knows who sent it.
+		// Always stamp the sender's ID.
 		msg.From = p.id
 
 		switch msg.Type {
-		case "offer", "answer", "ice-candidate":
+		case "offer", "answer":
 			if msg.To == "" {
 				log.Warnf("conference: peer %s sent %q without a 'to' field", p.id, msg.Type)
 				continue
 			}
 			out, _ := json.Marshal(msg)
 			rm.relay(msg.To, out)
+
+		case "candidate":
+			if msg.To == "" {
+				log.Warnf("conference: peer %s sent candidate without a 'to' field", p.id)
+				continue
+			}
+			out, _ := json.Marshal(msg)
+			rm.relay(msg.To, out)
+
+		case "leave":
+			return
 
 		default:
 			log.Warnf("conference: unknown message type %q from peer %s", msg.Type, p.id)
@@ -341,7 +394,7 @@ func conferenceHandler(w http.ResponseWriter, r *http.Request) {
 // so that mobile clients on the VPN can reach it without the localhost restriction.
 func startConferenceServer() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/room/", conferenceHandler)
+	mux.HandleFunc("/", conferenceHandler)
 
 	log.Infof("Conference: WebSocket signaling server listening on %s", conferenceAddr)
 	if err := http.ListenAndServe(conferenceAddr, mux); err != nil {
