@@ -26,22 +26,24 @@ type PeerInfo struct {
 //
 // Client → Server:
 //
-//	"join"      { roomId, name, avatar }
-//	"offer"     { to, sdp }
-//	"answer"    { to, sdp }
-//	"candidate" { to, candidate, sdpMid, sdpMLineIndex }
+//	"join"        { roomId, name, avatar }
+//	"offer"       { to, sdp }
+//	"answer"      { to, sdp }
+//	"candidate"   { to, candidate, sdpMid, sdpMLineIndex }
+//	"media_state" { audioMuted, videoOff }
 //	"leave"
 //
 // Server → Client:
 //
-//	"welcome"    { id }
-//	"room_state" { peers:[{id,name,avatar}] }
-//	"peer_joined"{ id, name, avatar }
-//	"peer_left"  { id }
-//	"offer"      { from, sdp }
-//	"answer"     { from, sdp }
-//	"candidate"  { from, candidate, sdpMid, sdpMLineIndex }
-//	"error"      { message }
+//	"welcome"     { id }
+//	"room_state"  { peers:[{id,name,avatar}] }
+//	"peer_joined" { id, name, avatar }
+//	"peer_left"   { id }
+//	"offer"       { from, sdp }
+//	"answer"      { from, sdp }
+//	"candidate"   { from, candidate, sdpMid, sdpMLineIndex }
+//	"media_state" { from, audioMuted, videoOff }
+//	"error"       { message }
 type SignalMessage struct {
 	Type   string `json:"type"`
 	// Identity / room
@@ -60,6 +62,9 @@ type SignalMessage struct {
 	Candidate     string  `json:"candidate,omitempty"`
 	SdpMid        *string `json:"sdpMid,omitempty"`
 	SdpMLineIndex *int    `json:"sdpMLineIndex,omitempty"`
+	// Media state (mute / video-off)
+	AudioMuted *bool `json:"audioMuted,omitempty"`
+	VideoOff   *bool `json:"videoOff,omitempty"`
 	// Error
 	Message string `json:"message,omitempty"`
 }
@@ -379,6 +384,10 @@ func conferenceHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			out, _ := json.Marshal(msg)
 			rm.relay(msg.To, out)
+
+		case "media_state":
+			out, _ := json.Marshal(msg)
+			rm.broadcast(out, p.id)
 
 		case "leave":
 			return
