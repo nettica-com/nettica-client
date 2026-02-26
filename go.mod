@@ -1,14 +1,12 @@
 module nettica-client
 
-go 1.23.0
-
-toolchain go1.24.0
+go 1.26
 
 require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/huin/goupnp v1.3.0
 	github.com/miekg/dns v1.1.65
-	github.com/nettica-com/nettica-admin v0.0.0-20250410133612-b0dc7c9a1241
+	github.com/nettica-com/nettica-admin v0.0.0-20260226052009-4aef46172bfe
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/sys v0.32.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20241231184526-a9ab2273dd10
@@ -39,7 +37,7 @@ require (
 	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/mod v0.24.0 // indirect
 	golang.org/x/net v0.39.0 // indirect
-	golang.org/x/oauth2 v0.29.0 // indirect
+	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/tools v0.32.0 // indirect

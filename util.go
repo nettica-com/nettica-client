@@ -121,7 +121,31 @@ func CompareDevices(d1 *model.Device, d2 *model.Device) bool {
 		return false
 	}
 
+	if !boolPtrEq(d1.TextEnabled, d2.TextEnabled) {
+		return false
+	}
+
+	if !boolPtrEq(d1.VideoEnabled, d2.VideoEnabled) {
+		return false
+	}
+
+	if !boolPtrEq(d1.ConferenceEnabled, d2.ConferenceEnabled) {
+		return false
+	}
+
 	return true
+}
+
+// boolPtrEq returns true when both pointers are nil, or both are non-nil
+// and point to the same bool value.
+func boolPtrEq(a, b *bool) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
 }
 
 // function merges two devices, d1 is the source, d2 is the destination
@@ -193,6 +217,12 @@ func MergeDevices(d1 *model.Device, d2 *model.Device) {
 	}
 
 	d2.EZCode = d1.EZCode
+
+	// Capability flags are server-authoritative: always take the server's value,
+	// including nil (meaning "not set / unknown").
+	d2.TextEnabled = d1.TextEnabled
+	d2.VideoEnabled = d1.VideoEnabled
+	d2.ConferenceEnabled = d1.ConferenceEnabled
 
 }
 

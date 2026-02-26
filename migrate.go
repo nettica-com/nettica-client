@@ -45,6 +45,7 @@ func Migrate() {
 
 	// temporarily copy the file instead of renaming it so old agent can still read it
 	//err = os.Rename(GetDataPath()+"nettica.json", GetDataPath()+"my.nettica.com.json")
+	t := true
 	var msg model.Message
 	data, err := os.ReadFile(GetDataPath() + "nettica.json")
 	if err != nil {
@@ -55,9 +56,16 @@ func Migrate() {
 			name := msg.Device.Server
 			name = strings.Replace(name, "https://", "", -1)
 			name = strings.Replace(name, "http://", "", -1)
-			err = os.WriteFile(GetDataPath()+name+".json", data, 0644)
+			msg.Device.TextEnabled = &t
+			msg.Device.VideoEnabled = &t
+			data, err = json.Marshal(msg)
 			if err != nil {
-				log.Errorf("Failed to create %s.json: %v", name, err)
+				log.Errorf("Failed to marshal migrated message: %v", err)
+			} else {
+				err = os.WriteFile(GetDataPath()+name+".json", data, 0644)
+				if err != nil {
+					log.Errorf("Failed to create %s.json: %v", name, err)
+				}
 			}
 		} else {
 			log.Errorf("Failed to unmarshal %s: %v", "nettica.json", err)

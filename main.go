@@ -54,6 +54,8 @@ func main() {
 
 	// If the config is set by environment variables, ignore
 	// the config file
+	t := true
+	f := false
 	if cfg.Server != "" && cfg.DeviceID != "" && cfg.ApiKey != "" {
 		log.Info("Using environment variables for configuration")
 		msg := model.Message{}
@@ -64,6 +66,9 @@ func main() {
 		msg.Device.ApiKey = cfg.ApiKey
 		msg.Device.UpdateKeys = cfg.UpdateKeys
 		msg.Device.Enable = true
+		msg.Device.ConferenceEnabled = &t
+		msg.Device.TextEnabled = &f
+		msg.Device.VideoEnabled = &f
 		msg.Device.CheckInterval = 10
 
 		if cfg.debug {
