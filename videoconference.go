@@ -17,9 +17,11 @@ const conferenceAddr = "0.0.0.0:3001"
 
 // PeerInfo is the lightweight peer descriptor used in room_state and peer_joined.
 type PeerInfo struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Avatar string `json:"avatar,omitempty"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Avatar     string `json:"avatar,omitempty"`
+	AudioMuted bool   `json:"audioMuted,omitempty"`
+	VideoOff   bool   `json:"videoOff,omitempty"`
 }
 
 // SignalMessage is the envelope for all WebRTC signaling messages.
@@ -36,8 +38,8 @@ type PeerInfo struct {
 // Server → Client:
 //
 //	"welcome"     { id }
-//	"room_state"  { peers:[{id,name,avatar}] }
-//	"peer_joined" { id, name, avatar }
+//	"room_state"  { peers:[{id,name,avatar,audioMuted,videoOff}] }
+//	"peer_joined" { id, name, avatar, audioMuted, videoOff }
 //	"peer_left"   { id }
 //	"offer"       { from, sdp }
 //	"answer"      { from, sdp }
@@ -71,12 +73,14 @@ type SignalMessage struct {
 
 // peer represents a single connected WebSocket client.
 type peer struct {
-	id     string
-	name   string
-	avatar string
-	conn   *websocket.Conn
-	send   chan []byte
-	mu     sync.Mutex // guards conn writes
+	id         string
+	name       string
+	avatar     string
+	audioMuted bool
+	videoOff   bool
+	conn       *websocket.Conn
+	send       chan []byte
+	mu         sync.Mutex // guards conn writes
 }
 
 // room holds all peers currently in a conference room.
@@ -109,7 +113,7 @@ func (r *room) peerInfos(exclude string) []PeerInfo {
 	infos := make([]PeerInfo, 0, len(r.peers))
 	for id, p := range r.peers {
 		if id != exclude {
-			infos = append(infos, PeerInfo{ID: p.id, Name: p.name, Avatar: p.avatar})
+			infos = append(infos, PeerInfo{ID: p.id, Name: p.name, Avatar: p.avatar, AudioMuted: p.audioMuted, VideoOff: p.videoOff})
 		}
 	}
 	return infos
@@ -323,11 +327,15 @@ func conferenceHandler(w http.ResponseWriter, r *http.Request) {
 	sendJSON(p, SignalMessage{Type: "room_state", Peers: infos})
 
 	// Tell everyone else that a new peer has arrived.
+	audioMuted := p.audioMuted
+	videoOff := p.videoOff
 	joined, _ := json.Marshal(SignalMessage{
-		Type:   "peer_joined",
-		ID:     p.id,
-		Name:   p.name,
-		Avatar: p.avatar,
+		Type:       "peer_joined",
+		ID:         p.id,
+		Name:       p.name,
+		Avatar:     p.avatar,
+		AudioMuted: &audioMuted,
+		VideoOff:   &videoOff,
 	})
 	rm.broadcast(joined, p.id)
 
@@ -386,6 +394,12 @@ func conferenceHandler(w http.ResponseWriter, r *http.Request) {
 			rm.relay(msg.To, out)
 
 		case "media_state":
+			if msg.AudioMuted != nil {
+				p.audioMuted = *msg.AudioMuted
+			}
+			if msg.VideoOff != nil {
+				p.videoOff = *msg.VideoOff
+			}
 			out, _ := json.Marshal(msg)
 			rm.broadcast(out, p.id)
 
