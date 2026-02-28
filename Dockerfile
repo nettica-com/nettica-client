@@ -9,6 +9,7 @@ RUN env GOOS=linux CGO_ENABLED=0 go build -o /app/nettica-client -ldflags "-X ma
 FROM alpine:latest
 RUN apk add --no-cache wireguard-tools
 RUN apk add --no-cache iptables
+RUN apk add --no-cache openresolv
 RUN mkdir -p /etc/nettica
 COPY --from=builder /app/nettica-client /usr/bin
 COPY --from=builder /app/wg-hack/wg-quick /usr/bin
