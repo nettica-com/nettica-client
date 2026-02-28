@@ -7,12 +7,11 @@ ARG VERSION="docker"
 RUN env GOOS=linux CGO_ENABLED=0 go build -o /app/nettica-client -ldflags "-X main.Version=$VERSION" .
 
 FROM alpine:latest
-RUN apk add --no-cache wireguard-tools
-RUN apk add --no-cache iptables
-RUN apk add --no-cache openresolv
+RUN apk add --no-cache wireguard-tools iptables openresolv
 RUN mkdir -p /etc/nettica
 COPY --from=builder /app/nettica-client /usr/bin
 COPY --from=builder /app/wg-hack/wg-quick /usr/bin
-RUN chmod +x /usr/bin/wg-quick
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /usr/bin/wg-quick /entrypoint.sh
 USER root
-CMD ["/usr/bin/nettica-client"]
+ENTRYPOINT ["/entrypoint.sh"]
