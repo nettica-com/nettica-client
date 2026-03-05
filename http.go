@@ -597,8 +597,9 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 
 }
 
-func boolPtr(true bool) *bool {
-	panic("unimplemented")
+func boolPtr(b bool) *bool {
+	t := b
+	return &t
 }
 
 func startHTTPd() {
