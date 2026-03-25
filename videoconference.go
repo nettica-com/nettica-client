@@ -17,11 +17,13 @@ const conferenceAddr = "0.0.0.0:3001"
 
 // PeerInfo is the lightweight peer descriptor used in room_state and peer_joined.
 type PeerInfo struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	Avatar     string `json:"avatar,omitempty"`
-	AudioMuted bool   `json:"audioMuted,omitempty"`
-	VideoOff   bool   `json:"videoOff,omitempty"`
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Avatar        string `json:"avatar,omitempty"`
+	AvatarBase64  string `json:"avatarBase64,omitempty"`
+	AudioMuted    bool   `json:"audioMuted,omitempty"`
+	VideoOff      bool   `json:"videoOff,omitempty"`
+	ScreenSharing bool   `json:"screenSharing,omitempty"`
 }
 
 // SignalMessage is the envelope for all WebRTC signaling messages.
@@ -47,12 +49,13 @@ type PeerInfo struct {
 //	"media_state" { from, audioMuted, videoOff }
 //	"error"       { message }
 type SignalMessage struct {
-	Type   string `json:"type"`
+	Type string `json:"type"`
 	// Identity / room
-	ID     string `json:"id,omitempty"`
-	RoomID string `json:"roomId,omitempty"`
-	Name   string `json:"name,omitempty"`
-	Avatar string `json:"avatar,omitempty"`
+	ID           string `json:"id,omitempty"`
+	RoomID       string `json:"roomId,omitempty"`
+	Name         string `json:"name,omitempty"`
+	Avatar       string `json:"avatar,omitempty"`
+	AvatarBase64 string `json:"avatarBase64,omitempty"`
 	// Room state
 	Peers []PeerInfo `json:"peers,omitempty"`
 	// Relay routing
@@ -65,22 +68,24 @@ type SignalMessage struct {
 	SdpMid        *string `json:"sdpMid,omitempty"`
 	SdpMLineIndex *int    `json:"sdpMLineIndex,omitempty"`
 	// Media state (mute / video-off)
-	AudioMuted *bool `json:"audioMuted,omitempty"`
-	VideoOff   *bool `json:"videoOff,omitempty"`
+	AudioMuted    *bool `json:"audioMuted,omitempty"`
+	VideoOff      *bool `json:"videoOff,omitempty"`
+	ScreenSharing *bool `json:"screenSharing,omitempty"`
 	// Error
 	Message string `json:"message,omitempty"`
 }
 
 // peer represents a single connected WebSocket client.
 type peer struct {
-	id         string
-	name       string
-	avatar     string
-	audioMuted bool
-	videoOff   bool
-	conn       *websocket.Conn
-	send       chan []byte
-	mu         sync.Mutex // guards conn writes
+	id            string
+	name          string
+	avatar        string
+	audioMuted    bool
+	videoOff      bool
+	screenSharing bool
+	conn          *websocket.Conn
+	send          chan []byte
+	mu            sync.Mutex // guards conn writes
 }
 
 // room holds all peers currently in a conference room.
@@ -113,7 +118,7 @@ func (r *room) peerInfos(exclude string) []PeerInfo {
 	infos := make([]PeerInfo, 0, len(r.peers))
 	for id, p := range r.peers {
 		if id != exclude {
-			infos = append(infos, PeerInfo{ID: p.id, Name: p.name, Avatar: p.avatar, AudioMuted: p.audioMuted, VideoOff: p.videoOff})
+			infos = append(infos, PeerInfo{ID: p.id, Name: p.name, Avatar: p.avatar, AvatarBase64: p.avatar, AudioMuted: p.audioMuted, VideoOff: p.videoOff, ScreenSharing: p.screenSharing})
 		}
 	}
 	return infos
@@ -297,7 +302,11 @@ func conferenceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p.name = join.Name
-	p.avatar = join.Avatar
+	if join.Avatar != "" {
+		p.avatar = join.Avatar
+	} else {
+		p.avatar = join.AvatarBase64
+	}
 
 	rm := conference.getOrCreate(roomID)
 
@@ -329,13 +338,16 @@ func conferenceHandler(w http.ResponseWriter, r *http.Request) {
 	// Tell everyone else that a new peer has arrived.
 	audioMuted := p.audioMuted
 	videoOff := p.videoOff
+	screenSharing := p.screenSharing
 	joined, _ := json.Marshal(SignalMessage{
-		Type:       "peer_joined",
-		ID:         p.id,
-		Name:       p.name,
-		Avatar:     p.avatar,
-		AudioMuted: &audioMuted,
-		VideoOff:   &videoOff,
+		Type:          "peer_joined",
+		ID:            p.id,
+		Name:          p.name,
+		Avatar:        p.avatar,
+		AvatarBase64:  p.avatar,
+		AudioMuted:    &audioMuted,
+		VideoOff:      &videoOff,
+		ScreenSharing: &screenSharing,
 	})
 	rm.broadcast(joined, p.id)
 
@@ -399,6 +411,9 @@ func conferenceHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			if msg.VideoOff != nil {
 				p.videoOff = *msg.VideoOff
+			}
+			if msg.ScreenSharing != nil {
+				p.screenSharing = *msg.ScreenSharing
 			}
 			out, _ := json.Marshal(msg)
 			rm.broadcast(out, p.id)
