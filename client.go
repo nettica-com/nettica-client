@@ -396,7 +396,7 @@ func (w *Worker) CallNettica(etag *string) ([]byte, error) {
 		resp.Body.Close()
 
 		if resp.StatusCode == 304 {
-			buffer := w.Context.Body
+			buffer := w.Context.GetBody()
 			return buffer, nil
 		} else if resp.StatusCode == 401 {
 			return nil, fmt.Errorf("Unauthorized")
@@ -756,6 +756,12 @@ func (w *Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 
 	defer func() {
 		Bounce = false
+		if r := recover(); r != nil {
+			log.Errorf("Panic in UpdateNetticaConfig: %v", r)
+			log.Errorf("Body: %s", string(body))
+
+			return
+		}
 	}()
 
 	// If the file doesn't exist create it for the first time
@@ -766,7 +772,7 @@ func (w *Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 		}
 	}
 
-	conf := w.Context.Body
+	conf := w.Context.GetBody()
 
 	// compare the body to the current config and make no changes if they are the same
 	if bytes.Equal(conf, body) && !Bounce && !FailSafe && !isBackground {
@@ -788,9 +794,11 @@ func (w *Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 
 		// if we can't read the message, immediately return
 		var msg model.Message
-		err := json.Unmarshal(body, &msg)
+		decoder := json.NewDecoder(bytes.NewReader(body))
+		err := decoder.Decode(&msg)
 		if err != nil {
-			log.Errorf("Error reading message from server")
+			log.Errorf("Error reading message from server: %v", err)
+			// Take the error path: do not proceed, just return
 			return
 		}
 
@@ -805,11 +813,11 @@ func (w *Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 
 		// Update the Server Config / Context with this new message
 		w.Context.Config = msg
-		w.Context.Body = body
+		w.Context.SetBody(body)
 		SaveServer(w.Context)
 
 		var oldconf model.Message
-		err = json.Unmarshal(conf, &oldconf)
+		err = json.NewDecoder(bytes.NewReader(conf)).Decode(&oldconf)
 		if err != nil {
 			log.Errorf("Error reading old config: %v", err)
 			log.Infof("Old config: %v", string(conf))
@@ -852,7 +860,7 @@ func (w *Worker) UpdateNetticaConfig(body []byte, isBackground bool) {
 
 		// make a copy of the message since UpdateDNS will alter it.
 		var msg2 model.Message
-		json.Unmarshal(body, &msg2)
+		json.NewDecoder(bytes.NewReader(body)).Decode(&msg2)
 
 		// first, delete any nets that are no longer in the conf
 		for i := 0; i < len(oldconf.Config); i++ {
@@ -1319,7 +1327,7 @@ func (w *Worker) FindVPN(net string) (*model.VPN, *[]model.VPN, error) {
 func (w *Worker) FindVPNById(id string) (*model.VPN, *[]model.VPN, error) {
 
 	var msg model.Message
-	err := json.Unmarshal(w.Context.Body, &msg)
+	err := json.NewDecoder(bytes.NewReader(w.Context.GetBody())).Decode(&msg)
 
 	if err != nil {
 		log.Errorf("Error reading message from context")
@@ -1345,8 +1353,8 @@ func (w *Worker) StopAllVPNs() error {
 
 	var msg model.Message
 
-	conf := w.Context.Body
-	err := json.Unmarshal(conf, &msg)
+	conf := w.Context.GetBody()
+	err := json.NewDecoder(bytes.NewReader(conf)).Decode(&msg)
 	if err != nil {
 		log.Errorf("Error reading message from config file")
 		return err
@@ -1392,7 +1400,7 @@ func (w *Worker) StopAllVPNs() error {
 	}
 
 	w.Context.Config = msg
-	w.Context.Body = body
+	w.Context.SetBody(body)
 	SaveServer(w.Context)
 
 	return nil
@@ -1408,9 +1416,9 @@ func (w *Worker) StartBackgroundRefreshService() {
 
 	for !w.Context.Shutdown {
 
-		if w.Context.Body != nil {
+		if body := w.Context.GetBody(); body != nil {
 			log.Info("Background Refresh!")
-			w.UpdateNetticaConfig(w.Context.Body, true)
+			w.UpdateNetticaConfig(body, true)
 		}
 
 		// Do this startup process every hour.  Keeps UPnP ports active, handles laptop sleeps, etc.

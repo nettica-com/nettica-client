@@ -1,6 +1,10 @@
 package main
 
-import "github.com/nettica-com/nettica-admin/model"
+import (
+	"sync"
+
+	"github.com/nettica-com/nettica-admin/model"
+)
 
 type Server struct {
 	Name     string        `json:"name"`
@@ -10,6 +14,21 @@ type Server struct {
 	Running  chan bool     `json:"-"`
 	Shutdown bool          `json:"-"`
 	Worker   *Worker       `json:"-"`
+	bodyMu   sync.RWMutex
+}
+
+func (s *Server) GetBody() []byte {
+	s.bodyMu.RLock()
+	defer s.bodyMu.RUnlock()
+	b := make([]byte, len(s.Body))
+	copy(b, s.Body)
+	return b
+}
+
+func (s *Server) SetBody(body []byte) {
+	s.bodyMu.Lock()
+	defer s.bodyMu.Unlock()
+	s.Body = body
 }
 
 type ClientWorker interface {

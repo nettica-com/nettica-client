@@ -100,7 +100,7 @@ func LoadServers() error {
 			}
 
 			server.Path = path
-			server.Body = data
+			server.SetBody(data)
 			server.Running = make(chan bool)
 
 			Servers[path] = &server
@@ -125,7 +125,7 @@ func SaveServer(server *Server) {
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		log.Printf("Failed to write file %s: %v", path, err)
 	}
-	server.Body = data
+	server.SetBody(data)
 }
 
 func CleanupName(name string) string {

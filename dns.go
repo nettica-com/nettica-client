@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -90,7 +91,7 @@ func StartDNS() error {
 	for _, s := range Servers {
 
 		var msg model.Message
-		err := json.Unmarshal(s.Body, &msg)
+		err := json.NewDecoder(bytes.NewReader(s.GetBody())).Decode(&msg)
 		if err != nil {
 			log.Errorf("Error reading message from config file")
 			return err
@@ -564,7 +565,7 @@ func MakeQuery(resolver string, net string, q *dns.Msg) (*dns.Msg, error) {
 				s += r.Answer[0].(*dns.CNAME).Target
 			}
 		}
-		log.Debugf(s)
+		log.Debug(s)
 	}
 	return r, nil
 }

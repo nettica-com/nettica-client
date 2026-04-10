@@ -129,7 +129,7 @@ func StartContainers(s *Server) error {
 		return err
 	}
 	var msg model.ServiceMessage
-	err = json.Unmarshal(body, &msg)
+	err = json.NewDecoder(bytes.NewReader(body)).Decode(&msg)
 	if err != nil {
 		log.Errorf("Error unmarshalling service host config file: %v", err)
 		return err
@@ -271,14 +271,14 @@ func UpdateServiceHostConfig(s *Server, body []byte) {
 			return
 		}
 		var msg model.ServiceMessage
-		err = json.Unmarshal(body, &msg)
+		err = json.NewDecoder(bytes.NewReader(body)).Decode(&msg)
 
 		if err != nil {
 			log.Errorf("Error reading message from server")
 		}
 
 		var oldmsg model.ServiceMessage
-		err = json.Unmarshal(conf, &oldmsg)
+		err = json.NewDecoder(bytes.NewReader(conf)).Decode(&oldmsg)
 
 		if err != nil {
 			log.Errorf("Error reading message from disk")
