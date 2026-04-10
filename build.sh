@@ -60,7 +60,7 @@ for ARCH in ${ARCHS[@]}; do
     echo "Building version $VERSION for $ARCH/$GOARCH"
 
 
-    if go build -ldflags "-X main.Version=$VERSION" ; then
+    if go build -v -ldflags "-X main.Version=$VERSION" ; then
        echo "Build success"
     else
         echo "Build failed"
