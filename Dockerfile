@@ -5,7 +5,7 @@ RUN go mod download
 COPY . .
 ARG VERSION="docker"
 RUN env GOOS=linux CGO_ENABLED=0 go build -o /app/nettica-client -ldflags "-X main.Version=$VERSION" .
-FROM alpine:edge
+FROM alpine:latest
 RUN apk add --no-cache wireguard-tools iptables openresolv openssl
 RUN mkdir -p /etc/nettica
 COPY --from=builder /app/nettica-client /usr/bin
