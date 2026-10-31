@@ -1,0 +1,21 @@
+{
+  "@context": "https://openvex.dev",
+  "@id": "https://openvex.dev",
+  "author": "Nettica Corporation",
+  "timestamp": "2026-07-11T00:00:00Z",
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "GO-2026-5932"
+      },
+      "products": [
+        {
+          "@id": "pkg:golang/golang.org/x/crypto"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "component_not_present",
+      "impact_statement": "The vulnerable openpgp sub-package is not used or imported anywhere in this application."
+    }
+  ]
+}

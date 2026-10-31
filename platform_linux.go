@@ -256,14 +256,14 @@ func LaunchDNS(address string) (*DNS_SERVER, error) {
 	log.Infof("Starting UDP & TCP DNS Server on %s", address)
 	go func() {
 		FlushDNS()
-		if err := server.udp.ListenAndServe(); err != nil {
+		if err := listenAndServeDNS(server.udp, address); err != nil {
 			log.Warnf("Failed to setup the UDP DNS server on %s: %s", address, err.Error())
 			StopDNS(address)
 		}
 	}()
 
 	go func() {
-		if err := server.tcp.ListenAndServe(); err != nil {
+		if err := listenAndServeDNS(server.tcp, address); err != nil {
 			log.Warnf("Failed to setup the TCP DNS server on %s: %s", address, err.Error())
 			StopDNS(address)
 		}

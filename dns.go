@@ -35,6 +35,11 @@ var (
 // quiet      bool
 )
 
+const (
+	dnsBindRetries    = 3
+	dnsBindRetryDelay = 2 * time.Second
+)
+
 var blackhole = []string{
 	"168.192.in-addr.arpa",
 	"10.in-addr.arpa",
@@ -155,6 +160,38 @@ func StartDNS() error {
 	log.Infof("DNS Resolvers: %v", global.Resolvers)
 
 	return nil
+}
+
+// listenAndServeDNS runs the DNS server, retrying if it fails to bind (for example,
+// when the VPN address hasn't been assigned to the interface yet).  It stops retrying
+// if the server is stopped or replaced while waiting.
+func listenAndServeDNS(server *dns.Server, address string) error {
+	var err error
+	for attempt := 0; attempt <= dnsBindRetries; attempt++ {
+		if attempt > 0 {
+			log.Warnf("Failed to bind the %s DNS server on %s, retry %d of %d: %v", server.Net, address, attempt, dnsBindRetries, err)
+			time.Sleep(dnsBindRetryDelay)
+			if !isDNSServerActive(server, address) {
+				log.Infof("The %s DNS server on %s was stopped, not retrying", server.Net, address)
+				return nil
+			}
+		}
+		err = server.ListenAndServe()
+		var opErr *net.OpError
+		if !errors.As(err, &opErr) || opErr.Op != "listen" {
+			return err
+		}
+	}
+	return err
+}
+
+// isDNSServerActive reports whether the server is still the one registered for address
+func isDNSServerActive(server *dns.Server, address string) bool {
+	globalLock.Lock()
+	defer globalLock.Unlock()
+
+	s := global.DnsServers[address]
+	return s != nil && (s.udp == server || s.tcp == server)
 }
 
 func ParseMessage(msg model.Message) (*DNS, error) {
